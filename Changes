@@ -5,3 +5,5 @@
 20020601 1.14 fixed 'require Clui.raw' bug in test_script
 20020622 1.15 new Install script, and old MakeMaker-compatible Makefile.PL
 20020626 1.16 Install gets default dirs right, &tiview simpler if <3 lines
+20020911 1.17 &choose default dbm is now in ~/.clui_dir & obeys $CLUI_DIR
+20020912 1.17 &choose default dbm handles collisions

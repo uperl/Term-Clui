@@ -8,11 +8,11 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.16';
+$VERSION = '1.17';
 require Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw(ask_password ask confirm choose edit sorry view);
-@EXPORT_OK = qw(beep tiview back_up);
+@EXPORT_OK = qw(beep tiview back_up get_default set_default);
 
 no strict; local $^W = 0;
 
@@ -236,6 +236,8 @@ sub debug {
 }
 
 my (%irow, %icol, $nrows, $clue_has_been_given, $choice, $this_cell);
+my $HOME = $ENV{'HOME'} || $ENV{'LOGDIR'} || (getpwuid($<))[7];
+srand(time() ^ ($$+($$<15)));
 
 sub choose {  local ($question, @list) = @_;
 	# If called in array context, should probably allow multiple choice,
@@ -246,16 +248,11 @@ sub choose {  local ($question, @list) = @_;
 	grep (($_ =~ s/\n$//) && 0, @list);	# chop final \n if any
 	my @biglist = @list; my $icell;
 
-	my $home = $ENV{'HOME'} || $ENV{'LOGDIR'} || (getpwuid($<))[7];
-	mkdir ("$home/db", 0750);
-
 	$question =~ s/^[\n\r]+//;   # strip initial newline(s)
 	$question =~ s/[\n\r]+$//;   # strip final newline(s)
 	my ($firstline,$otherlines) = split ("\n", $question, 2);
 
-	if ($firstline && dbmopen (%CHOICES, "$home/db/choices", 0600)) {
-		$choice = $CHOICES{$firstline}; dbmclose %CHOICES;
-	}
+	$choice = &get_default($firstline);
 
 	&initscr (); &puts("$firstline\r\n");  &size_and_layout(0);
 	if ($nrows >= $maxrows) { @list = &narrow_the_search(@list); }
@@ -337,10 +334,7 @@ sub choose {  local ($question, @list) = @_;
 			&erase_lines(1);
 			&goto((length $firstline)+1,0); &puts($list[$this_cell]."\n\r");
 			&endwin();
-			if ($firstline && dbmopen (%CHOICES, "$home/db/choices", 0600)) {
-				$CHOICES{$firstline} = $list[$this_cell];
-				dbmclose %CHOICES;
-			}
+			&set_default($firstline, $list[$this_cell]);
 			$clue_has_been_given = 0;
 			return wantarray ? ($list[$this_cell]) : $list[$this_cell];
 		}
@@ -450,6 +444,52 @@ sub ask_for_clue { my ($nchoices, $i, $s) = @_;
 		&goto(0,1); &puts("No choices fit this clue !"); &clrtoeol();
 		&goto(0,2); &puts(" shorten the clue : "); &right($i);
 	}
+}
+sub get_default { my ($question) = @_;
+	if ($ENV{CLUI_DIR} eq 'OFF') { return undef; }
+	if (! $question) { return undef; }
+	my $choice;
+	my $n_tries = 5;
+	while ($n_tries--) {
+		if (dbmopen (%CHOICES, &dbm_file(), 0600)) {
+			last;
+		} else { 
+			if ($! eq 'Resource temporarily unavailable') {
+				my $wait = rand 0.45; select undef, undef, undef, $wait;
+			} else { return undef;
+			}
+		}
+	}
+	$choice = $CHOICES{$question}; dbmclose %CHOICES;
+	return $choice;
+}
+sub set_default { my ($question, $choice) = @_;
+	if ($ENV{CLUI_DIR} eq 'OFF') { return undef; }
+	if (! $question) { return undef; }
+	my $n_tries = 5;
+	while ($n_tries--) {
+		if (dbmopen (%CHOICES, &dbm_file(), 0600)) {
+			last;
+		} else { 
+			if ($! eq 'Resource temporarily unavailable') {
+				my $wait = rand 0.50; select undef, undef, undef, $wait;
+			} else { return undef;
+			}
+		}
+	}
+	$CHOICES{$question} = $choice; dbmclose %CHOICES;
+	return $choice;
+}
+sub dbm_file {
+	if ($ENV{CLUI_DIR} eq 'OFF') { return undef; }
+	my $db_dir;
+	if ($ENV{CLUI_DIR}) {
+		$db_dir = $ENV{CLUI_DIR};
+		$db_dir =~ s#^~/#$HOME/#;
+	} else { $db_dir = "$HOME/.clui_dir";
+	}
+	mkdir ($db_dir,0750);
+	return "$db_dir/choices";
 }
 
 # ----------------------- confirm stuff -------------------------
@@ -628,7 +668,7 @@ sub wr_screen_tiview {
 # -------------------------- infrastructure -------------------------
 
 sub display_question {   my $question = shift; my %options = @_;
-	# used by ask and confirm
+	# used by &ask and &confirm, but not by &choose ...
 	&check_size;
 	my ($firstline, @otherlines);
 	if ($options{nofirstline}) {
@@ -745,7 +785,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.16,
+This is Term::Clui.pm version 1.17,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
@@ -801,16 +841,22 @@ The next time the user is offered a choice with the same question,
 if that response is still in the list it is highlighted
 as the default; otherwise the first item is highlighted.
 Different parts of the code, or different applications using I<Term::Clui.pm>
-can exchange defaults simply by using the same question words,
-such as "Which printer ?".  The database I<~/db/choices> is available
-to be read or written if lower-level manipulation is needed.
+can therefore exchange defaults simply by using the same question words,
+such as "Which printer ?".
+
+The database I<~/.clui_dir/choices> or I<$ENV{CLUI_DIR}/choices>
+is available to be read or written if lower-level manipulation is needed,
+and the I<EXPORT_OK> routines I<&get_default>($question) and
+I<&set_default>($question, $choice) should be used for this purpose,
+as they handle DBM's problem with concurrent accesses.
+The whole default database mechanism can be disabled by
+I<CLUI_DIR=OFF> if you really want to :-(
 
 If the items won't fit on the screen, the user is asked to enter
 a substring as a clue. As soon as the matching items will fit,
 they are displayed to be chosen as normal. If the user pressed "q"
 at this choice, they are asked if they wish to change their substring
 clue; if they reply "n" to this, choose quits and returns I<undefined>.
-This behaviour is new at version 1.12.
 
 =item I<confirm>( $question );
 
@@ -851,8 +897,14 @@ if not, it tries `tput` before guessing 80x24.
 
 =head1 ENVIRONMENT
 
-Uses the environment variables HOME, LOGDIR, EDITOR and PAGER,
-if they are set.
+The environment variable I<CLUI_DIR> can be used (by programmer or user)
+to set the directory in which I<&choose> keeps its database of default choices.
+The default directory (changed at version 1.17) is now I<~/.clui_dir>
+and the whole default database mechanism can be disabled by
+I<CLUI_DIR = OFF> if you really want to :-(
+
+I<Clui.pm> also consults the environment variables
+HOME, LOGDIR, EDITOR and PAGER, if they are set.
 
 =head1 AUTHOR
 
