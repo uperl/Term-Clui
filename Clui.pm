@@ -6,10 +6,9 @@
 #     This module is free software; you can redistribute it and/or      #
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
-# #COMMENT#
 
 package Term::Clui;
-$VERSION = '#VERSION#';
+$VERSION = '1.15';
 require Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw(ask_password ask confirm choose edit sorry view);
@@ -336,7 +335,7 @@ sub choose {  local ($question, @list) = @_;
 			&wr_screen();
 		} elsif ($c eq "\r") {
 			&erase_lines(1);
-			&goto((length $firstline)+2,0); &puts($list[$this_cell]."\n\r");
+			&goto((length $firstline)+1,0); &puts($list[$this_cell]."\n\r");
 			&endwin();
 			if ($firstline && dbmopen (%CHOICES, "$home/db/choices", 0600)) {
 				$CHOICES{$firstline} = $list[$this_cell];
@@ -743,7 +742,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version #VERSION#,
+This is Term::Clui.pm version 1.15,
 #COMMENT#.
 
 =head1 WINDOW-SIZE

@@ -1,0 +1,108 @@
+#! /usr/bin/perl
+#########################################################################
+#        This Perl script is Copyright (c) 2002, Peter J Billam         #
+#               c/o P J B Computing, www.pjb.com.au                     #
+#                                                                       #
+#     This script is free software; you can redistribute it and/or      #
+#            modify it under the same terms as Perl itself.             #
+#########################################################################
+
+use Term::Clui;
+my $home = $ENV{'HOME'} || $ENV{'LOGDIR'}  || (getpwuid($<))[7];
+my $user = $ENV{'USER'} || $ENV{'LOGNAME'} || (getpwuid($<))[0];
+my $dir  = `pwd`; chop $dir;
+
+while (1) {
+	my @tasks = ('Browser','Config','Change directory','Edit','FTP');
+	if (-r './Makefile') { push (@tasks, 'Make'); }
+	push (@tasks, 'News');
+	if (-d "$home/.ssh") { push (@tasks, 'SSH'); }
+
+	my $task = &choose ("$user $dir", @tasks);
+	if (! $task) { exit 0;
+	} else { $task =~ s/ /_/g; eval "&$task";
+	}
+}
+sub Config {
+	my @files = grep (-w "$home/$_",
+	'.cshrc', '.efaxrc', '.exrc', '.fvwmrc', '.jnewsrc', '.login',
+	'.lynxrc', 'lynx_bookmarks.html',
+	'.mailrc', '.netrc', '.newsrc', '.pinerc', '.popslurp',
+	'.profile', '.rhosts', '.slrnrc', '.tiprc', '.xauth', '.Xauthority',
+	'.xinitrc',
+	);
+	my $file;
+	$file = &choose("Edit which file ?", @files);
+	return unless $file;
+	&edit("$home/$file");
+}
+sub Browser {
+	system '/usr/bin/lynx';  # w3m ?
+}
+sub Change_directory {
+	my $newdir = &ask('to which directory ?');
+	return unless $newdir;
+	$newdir =~ s/^~\//$home\//;
+	if (! -d $newdir) { &sorry("$newdir isn't a directory"); return; }
+	if (! chdir $newdir) { &sorry("can't chdir to $newdir: $!"); return; }
+	$dir = $newdir;
+}
+sub Edit {
+	if (!opendir(D,'.')) { &sorry("can't open current directory: $!"); return; }
+	my @textfiles = sort grep (-T && !/^\./, readdir D); closedir D;
+	my $file = 'Create new file';
+	if (@textfiles) {
+		$file = &choose('Edit which file ?',@textfiles,'Create new file');
+		return unless $file;
+	}
+	if ($file eq 'Create new file') {
+		$file = &ask('New file name ?'); return unless $file;
+		system "touch $file";
+	}
+	&edit($file);
+}
+sub FTP {
+	if (!open(F,"$home/.netrc")) {
+		&sorry("can't open $home/.netrc: $!"); return;
+	}
+	my (%login, %password);
+	while (<F>) {
+		if (/^machine\s+(\S+)\s+login\s+(\S+)\s+password\s+(\S+)\s*$/) {
+			$login{$1} = $2; $password{$1} = $3;
+		}
+	}
+	close F;
+	my $task = &choose('FTP to :', keys %login, 'Edit ~/.netrc');
+	if (! $task) { return 1;
+	} elsif ($task eq 'Edit ~/.netrc') { &edit("$home/.netrc");
+	} else { system "ftp $task";
+	}
+}
+sub Make {
+	if (!open(F,'./Makefile')) { &sorry("can't open Makefile: $!"); return; }
+	my @targets;
+	while (<F>) { if (/^\s*(\S+)\s*:/) { push (@targets, $1); } }
+	close F;
+	my $target = &choose("$dir : Make what ?", @targets);
+	return unless $target;
+	system "make $target";
+}
+sub News {
+	system 'slrn';  # /usr/bin/*rn ?
+}
+sub SSH {
+	if (! open(F,"$home/.ssh/known_hosts")) {
+		&sorry("can't open $home/.ssh/known_hosts: $!"); return;
+	}
+	my (%hosts);
+	while (<F>) { if (/^(\S+)\s/) { $hosts{$1}++; } }
+	close F;
+	my @hosts = sort keys %hosts;
+	my $host = &choose('SSH to :', @hosts, 'Somewhere else');
+	if (! $host) { return 1;
+	} elsif ($host eq 'Somewhere else') {
+		$host = &ask('ssh to which host ?');
+		if ($host) { system "ssh $host"; }
+	} else { system "ssh $host";
+	}
+}

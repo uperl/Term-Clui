@@ -1,7 +1,10 @@
 Changes
+Install
 Clui.pm
-FileSelect.pm
+Clui/FileSelect.pm
 Makefile.PL
+test.pl
 MANIFEST
 README
-test_script
+examples/login_shell
+examples/test_script

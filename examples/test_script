@@ -6,8 +6,19 @@
 #     This script is free software; you can redistribute it and/or      #
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
-require './Clui.pm'; import Term::Clui;
-require './FileSelect.pm'; import Term::Clui::FileSelect;
+eval "require 'Term/Clui.pm'";
+if ($@) { eval "require './Clui.pm'"; }
+if ($@) { eval "require '../Clui.pm'"; }
+if ($@) { die "can't find Clui.pm in INC path, this dir, or parent dir\n"; }
+import Term::Clui;
+
+eval "require 'Term/Clui/FileSelect.pm'";
+if ($@) { eval "require './Clui/FileSelect.pm'"; }
+if ($@) { eval "require '../Clui/FileSelect.pm'"; }
+if ($@) {
+	die "can't find FileSelect.pm in INC path, this dir, or parent dir\n";
+}
+import Term::Clui::FileSelect;
 
 while (1) {
 	my $task = &choose ('Test which Clui.pm subroutine ?',

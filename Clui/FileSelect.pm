@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '#VERSION#';
+$VERSION = '1.15';
 # use Term::Clui;
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
@@ -167,6 +167,9 @@ the options are modelled on those of Tk::FileDialog
 and of Tk::SimpleFileSelect,
 but various new options are introduced, namely I<-TopDir>,
 I<-TextFile>, I<-Readable>, I<-Writeable>, I<-Executable> and I<-Owned>.
+
+This is Term::Clui::FileSelect.pm version 1.15,
+#COMMENT#.
 
 =head1 SUBROUTINES
 
