@@ -1,0 +1,4 @@
+20020119 1.10 old enter, choose, edit, confirm rolled into one
+20020121 1.11 added README, &ask takes default and bugs fixed
+20020130 1.12 &choose handles big lists with &narrow_the_search
+20020519 1.13 add FileSelect.pm and "man Term::Clui" works (ie with ::)

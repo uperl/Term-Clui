@@ -6,13 +6,16 @@
 #     This module is free software; you can redistribute it and/or      #
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
+# #COMMENT#
 
 package Term::Clui;
 $VERSION = '#VERSION#';
 require Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw(ask_password ask confirm choose edit sorry view);
-@EXPORT_OK = qw(beep tiview);
+@EXPORT_OK = qw(beep tiview back_up);
+
+no strict; local $^W = 0;
 
 # ------------------------ vt100 stuff -------------------------
 
@@ -139,14 +142,14 @@ sub initscr {
 	# if ($bsd) { system "stty cbreak </dev/tty >/dev/tty 2>&1";
 	# } else { system "stty", '-icanon'; system "stty", 'eol', "\001";
 	# }
-	require 'flush.pl'; &flush (TTY);
-	select((select(TTY), $| = 1)[$[]);
+
+	select((select(TTY), $| = 1)[$[]); print TTY "";
 	$icol = 0; $irow = 0; $initscr_already_run = 1;
 }
 sub endwin {
 	print TTY "\033[0m";
 	if ($initscr_already_run > 1) { $initscr_already_run--; return; }
-	&flush (TTY); close TTY; close TTYIN;
+	close TTY; close TTYIN;
 	if ($^O eq 'FreeBSD') { system("stty $stty </dev/tty") if $stty;
 	} else { system("stty $stty </dev/tty >/dev/tty") if $stty;
 	}
@@ -596,7 +599,7 @@ sub tiview {	local ($title, $text) = @_;
 	
 	&check_size;
 	local @rows = &fmt($text, nofill=>1);
-	&initscr ();
+	&initscr();
 	if ($titlelength > ($maxcols-35)) { &puts ("$title\r\n");
 	} else { &puts ("$title   (<enter> to continue, q to clear)\r\n");
 	}
@@ -685,9 +688,16 @@ sub fmt { my $text = shift; my %options = @_;
 	} else { return splice (@o_lines, $[, $maxrows-2);
 	}
 }
+sub back_up {
+	open(TTY, ">/dev/tty") || (warn "Can't write /dev/tty: $!\n", return 0);
+	print TTY "\r\033[K\033[A\033[K";
+	close TTY;
+}
 1;
 
 __END__
+
+=pod
 
 =head1 NAME
 
@@ -731,6 +741,8 @@ It doesn't use I<curses> (which is a whole-of-screen interface);
 it uses a small subset of vt100 sequences (up down left right normal
 and reverse) which are very portable.
 
+There is an associated file selector, Term::Clui::FileSelect
+
 This is Term::Clui.pm version #VERSION#,
 #COMMENT#.
 
@@ -751,11 +763,9 @@ and successive blank lines are collapsed into one.
 If the question will not fit within the available rows, it is truncated.
 
 If the available choice items in a I<&choose> overflow the screen,
-then currently I<complete.pl> is invoked.  This is fine if the user knows
-the item they want by its first letters, but it's not good otherwise.
-It will be replaced by asking the user to enter 'clue' letters,
+the user is asked to enter 'clue' letters,
 and as soon as the items matching them will fit onto the screen
-they will be displayed as a choice.
+they are displayed as a choice.
 
 =head1 SUBROUTINES
 
@@ -833,8 +843,7 @@ if the user presses 'q' the text is erased.
 
 =head1 DEPENDENCIES
 
-It requires Exporter, flush.pl, and (currently) complete.pl,
-which are all core Perl.
+It requires Exporter, which is core Perl.
 It uses Term::Size.pm if it's available;
 if not, it tries `tput` before guessing 80x24.
 
@@ -855,6 +864,7 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 =head1 SEE ALSO
 
+Term::Clui::FileSelect ,
 http://www.pjb.com.au/ , perl(1), http://www.cpan.org/SITES.html
 
 =cut

@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-require './Clui.raw'; import Term::Clui;
+require './Clui.pm'; import Term::Clui;
 
 &check_kit;
 
@@ -8,14 +8,14 @@ The behaviour of this script varies according to which directories
 you can write to; therefore you should run it as the same user (eg
 root) that will execute the 'make install' step.
 
-It will end up installing the module Clui.pm and also possibly its
-manual page.
+It will end up installing the modules Clui.pm and Clui/FileSelect.pm
+and optionally also their manual pages.
 
 Use the arrow keys (or h,j,k,l) and <Return> to make your choices.
 
 EOT
 
-my $version = '1.12';
+my $version = '1.13';
 # my $bindir  = &bindir;
 my $libdir  = &libdir . '/Term';
 my $mandir  = &mandir;
@@ -32,36 +32,55 @@ if ($mandir)  { print F "MANDIR = $mandir\n"; }
 
 print F <<'EOT';
 
-local : Clui.pm
+local : Clui.local
 
 EOT
 if ($mandir) { print F <<'EOT';
-install : local ${LIBDIR}/Clui.pm \
-${MANDIR}/Term_Clui.3
+install : local ${LIBDIR}/Clui.pm ${LIBDIR}/Clui/FileSelect.pm \
+${MANDIR}/Term_Clui.3 ${MANDIR}/Term_Clui_FileSelect.3
 EOT
 } else { print F <<'EOT';
-install : local ${LIBDIR}/Clui.pm
+install : local ${LIBDIR}/Clui.local ${LIBDIR}/Clui/FileSelect.local
 EOT
 }
 
 print F <<'EOT';
 
-Clui.pm : localise Clui.raw
-	./localise Clui.raw > $@
+Clui.local : localise Clui.pm
+	./localise Clui.pm > $@
 
-${LIBDIR}/Clui.pm : Clui.pm
-	perl -c Clui.pm
+${LIBDIR}/Clui.pm : Clui.local
+	perl -c Clui.local
 	test -d ${LIBDIR} || mkdir ${LIBDIR}
 	chmod 755 ${LIBDIR}
-	cp Clui.pm $@
+	cp Clui.local $@
 	chmod 644 $@
+
+FileSelect.local : localise FileSelect.pm
+	./localise FileSelect.pm > $@
+
+${LIBDIR}/Clui/FileSelect.pm : FileSelect.local
+	perl -c FileSelect.local
+	test -d ${LIBDIR}/Clui || mkdir ${LIBDIR}/Clui
+	chmod 755 ${LIBDIR}/Clui
+	cp FileSelect.local $@
+	chmod 644 $@
+
 
 EOT
 
 if ($mandir) { print F <<'EOT'; }
-${MANDIR}/Term_Clui.3 : Clui.pm
-	pod2man Clui.pm > $@
+${MANDIR}/Term_Clui.3 : Clui.local
+	pod2man Clui.local > $@
 	chmod 644 $@
+	cp $@ ${MANDIR}/Term::Clui.3
+	chmod 644 ${MANDIR}/Term::Clui.3
+
+${MANDIR}/Term_Clui_FileSelect.3 : FileSelect.local
+	pod2man FileSelect.local > $@
+	chmod 644 $@
+	cp $@ ${MANDIR}/Term::Clui::FileSelect.3
+	chmod 644 ${MANDIR}/Term::Clui::FileSelect.3
 
 EOT
 
@@ -129,15 +148,15 @@ sub libdir {
 	if (! @writeable) {
 		print STDERR <<'EOT';
 
-Where should the Perl module be installed ? You don't have write permission
+Where should the Perl modules be installed ? You don't have write permission
 to any of the directories in your @INC path; if you wish to install in some
 EOT
 		$libdir = &ask('other directory, enter it :');
-		if (! $libdir) { die "not installing, nowhere to install module\n"; }
+		if (! $libdir) { die "not installing, nowhere to install modules\n"; }
 		if (! -d $libdir) { die "Sorry, $libdir is not a directory.\n"; }
 		if (! -w $libdir) { die "Sorry, $libdir is not writeable.\n"; }
 	} else {
-		$libdir = &choose("Where should the Perl module be installed ?",
+		$libdir = &choose("Where should the Perl modules be installed ?",
 			@writeable, 'Somewhere Else');
 		if ($libdir eq 'Somewhere Else') {
 			$libdir = &ask('in which directory, then ?');
@@ -209,9 +228,11 @@ sub check_kit {
 	print STDERR "Checking your kit ... ";
 
 	my %file_sizes = (
-		'Makefile.PL', 6749,
-		'Clui.raw', 29387,
-		'test_script', 5134,
+		'MANIFEST', 70,
+		'Makefile.PL', 7450,
+		'Clui.pm', 29416,
+		'FileSelect.pm', 8777,
+		'test_script', 6200,
 	);
 
 	my $problem_found = 0;

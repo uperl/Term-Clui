@@ -7,24 +7,26 @@
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
 require './Clui.raw'; import Term::Clui;
+require './FileSelect.raw'; import Term::Clui::FileSelect;
 
-@colours = ('Red','Orange','Black','Grey','Blue');
-%names = (
-	Red => 'Fred',
-	Orange => 'Solange',
-	Black => 'Jack',
-	Grey => 'May',
-	Blue => 'Sue',
-);
-@paints  = (
-   'Alizarin Crimson', 'Burnt Sienna', 'Cadmium Yellow',
-   'Cobalt Blue', 'Flake White', 'Indian Red', 'Indian Yellow',
-   'Ivory Black', 'Lemon Yellow', 'Naples Yellow',
-   'Prussian Blue', 'Raw Sienna', 'Raw Umber', 'Red Ochre',
-   'Rose Madder', 'Ultramarine Blue',
-   'Vandyke Brown', 'Viridian Green', 'Yellow Ochre',
-);
-@scientists = (
+while (1) {
+	my $task = &choose ('Test which Clui.pm subroutine ?',
+		'ask','choose','confirm','edit','view','select_file',
+	);
+	exit unless $task;
+	eval "&test_$task()"; if ($@) { print STDERR "$@\n"; }
+}
+
+sub test_choose {
+	my @colours = ('Red','Orange','Black','Grey','Blue');
+	my @paints  = (
+  	'Alizarin Crimson', 'Burnt Sienna', 'Cadmium Yellow', 'Cobalt Blue',
+	'Flake White', 'Indian Red', 'Indian Yellow', 'Ivory Black', 'Lemon Yellow',
+	'Naples Yellow', 'Prussian Blue', 'Raw Sienna', 'Raw Umber', 'Red Ochre',
+  	'Rose Madder', 'Ultramarine Blue', 'Vandyke Brown', 'Viridian Green',
+	'Yellow Ochre',
+	);
+	my @scientists = (
 	'Luis Alvarez', 'Alain Aspect', 'Michael Barnsley', 'Johann Bernouilli',
 	'Nicolas Bernouilli', 'Friedrich Wilhelm Bessel', 'John Bell',
 	'Antoine Becquerel', 'Hans Bethe', 'David Bohm', 'Niels Bohr',
@@ -44,13 +46,12 @@ require './Clui.raw'; import Term::Clui;
 	'Peter Higgs', 'David Hilbert', 'Fred Hoyle', 'Edwin Hubble',
 	'Christian Huygens', 'David Hilbert', 'Edwin Hubble', 'Pascual Jordan',
 	'Gaston Julia', 'Marc Kac', 'Theodor Kaluza', 'Stuart Kauffman',
-	'William Lord Kelvin',
-	'Gustav Robert Kirchhoff', 'Oskar Klein', 'Helge von Kock', 'Willis Lamb',
-	'Lev Davidovich Landau', 'Paul Langevin', 'Pierre Simon de Laplace',
-	'Gottfried Wilhelm Leibnitz', 'Paul Lévy', 'Hendrik Lorentz',
-	'James Clark Maxwell', 'Marston Morse', 'Benoit Mandelbrot', 'Gregor Mendel',
-	'Dmitri Mendeleev', 'Robert Millikan', 'Hermann Minkowski',
-	'John von Neumann', 'Isaac Newton', 'Emmy Noether',
+	'William Lord Kelvin', 'Gustav Robert Kirchhoff', 'Oskar Klein',
+	'Helge von Kock', 'Willis Lamb', 'Lev Davidovich Landau', 'Paul Langevin',
+	'Pierre Simon de Laplace', 'Gottfried Wilhelm Leibnitz', 'Paul Lévy',
+	'Hendrik Lorentz', 'James Clark Maxwell', 'Marston Morse',
+	'Benoit Mandelbrot', 'Gregor Mendel', 'Dmitri Mendeleev', 'Robert Millikan',
+	'Hermann Minkowski', 'John von Neumann', 'Isaac Newton', 'Emmy Noether',
 	'Hans Christian Oersted', 'Lars Onsager', 'Robert Oppenheimer',
 	'Abraham Pais', 'Heinz Pagels', 'Vilfredo Pareto', 'Louis Pasteur',
 	'Wolfgang Pauli', 'Linus Pauling', 'Guiseppe Peano', 'Rudolf Peierls',
@@ -63,18 +64,23 @@ require './Clui.raw'; import Term::Clui;
 	'Sin-itro Tomonaga', 'Stanislaw Ulam', 'James Watson', 'Karl Weierstrauss',
 	'Hermann Weyl', 'Steven Weinberg', 'John Wheeler', 'Charles Weiner',
 	'Norbert Wiener', 'Eugene Wigner', 'Robert Wilson', 'Edward Witten',
-	'Shing-Tung Yau', 'Chen-Ning Yang', 'Hideki Yukawa',
-	'George Kingsley Zipf',
-);
+	'Shing-Tung Yau', 'Chen-Ning Yang', 'Hideki Yukawa', 'George Kingsley Zipf',
+	);
 
-# $task = &choose ("Which test ?",
+	$paint = &choose ("Your favourite paint ?", @paints);
+	$scientist = &choose ("Your favourite scientist ?", @scientists);
+	$colour = &choose (<<'EOT', @colours);
+Your favourite colour ?
 
-$scientist = &choose ("Your favourite scientist ?", @scientists);
-exit unless $scientist;
+This tests how the 'choose' subroutine handles multi-line
+questions ...
+EOT
+	warn "paint=$paint, scientist=$scientist, colour=$colour\n";
+	return;
+}
 
-$paint = &choose ("Your favourite paint ?", @paints); exit unless $paint;
-
-&confirm (<<EOT) || exit;
+sub test_confirm {
+	&confirm (<<EOT) || return;
 OK to proceed with the test ?
 
 This step checks the 'confirm' subroutine and whether it handles
@@ -83,9 +89,11 @@ first line should disappear,  leaving the question and answer on
 the screen as a record of the dialogue.
 EOT
 
-&confirm ('Did the text vanish except for the 1st line ?') || exit;
+	&confirm ('Did the text vanish except for the 1st line ?');
+}
 
-$dummy = &ask (<<EOT,);  exit unless $dummy;
+sub test_ask {
+	my $string = &ask (<<EOT,);
 Enter a string :
 
 The point of this test is to check out the behaviour of &ask
@@ -96,22 +104,44 @@ You should check ctrl-B (to beginning), ctrl-E (to end),
 backspace, left and right arrows, and ctrl-C (clear) ...
 EOT
 
-$colour = &choose (<<EOT, @colours); exit unless $colour;
-Your favourite colour ?
+	my @colours = ('Red','Orange','Black','Grey','Blue');
+	$colour = &choose ('Your favourite colour ?', @colours);
+	%names = (
+		Red=>'Fred', Orange=>'Solange', Black=>'Jack', Grey=>'May', Blue=>'Sue',
+	);
+	$name = &ask ("Choose a name which rhymes with $colour :", $names{$colour});
+	warn "string=$string, name=$name\n";
+}
 
-This tests the 'choose' subroutine and how it handles multi-line
-questions ...
-EOT
-
-$name = &ask ("Choose a name which rhymes with $colour :", $names{$colour});
-exit unless $name;
-
-$text = &edit ('Your limerick', <<EOT);
+sub test_edit {
+	$text = &edit ('Your limerick', <<EOT);
  There was a brave soul called $name,
  Whose favourite colour was $colour;
    But some $paint
    ...
  And that was the end of $name.
 EOT
+}
 
-&view('Your limerick:', $text);
+sub test_view {
+	&view('Your limerick:', 'gloop');
+}
+
+sub test_select_file {
+	my @bool_opts = ('-Chdir','-Create','-ShowAll','-DisableShowAll',
+		'-SelDir','-TextFile','-Readable','-Writeable','-Executable','-Owned');
+	my @text_opts = ('-FPat','-File','-Path','-Title','-TopDir');
+	my %opts;
+	while (1) {
+		foreach (@bool_opts) {
+			$opts{$_} = &choose("option $_ ?",'default','0','1');
+			if ($opts{$_} eq 'default') { delete $opts{$_}; }
+		}
+		foreach (@text_opts) {
+			$opts{$_} = &ask("option $_ ?", $opts{$_});
+			if (! $opts{$_}) { delete $opts{$_}; }
+		}
+		print STDERR "You selected " .&select_file(%opts), "\n";
+		last unless &confirm('Another test of FileSelector ?');
+	}
+}

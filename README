@@ -1,18 +1,19 @@
-       The Command-Line User Interface     Term::Clui.pm
+       The Command-Line User Interface     Term::Clui   1.13
 
 Term::Clui offers a high-level user interface, with subroutines &choose
-&ask &edit &view and &confirm.  It interfaces to the user at a much higher
-level than widgets; it gives command-line applications a consistent
-"look and feel". Its metaphor for the computer is as a human-like
-conversation-partner, and as each answer/response is completed it is
-summarised onto one line, and remains on screen, so that the history
-of the session gradually accumulates on the screen and is available for
-review, or for cut/paste.
+&ask &edit &view &confirm and &sorry. It works at a higher level than
+widgets; it gives command-line applications a consistent "look and feel".
+Its metaphor for the computer is a human-like conversation-partner,
+and as each answer/response is completed it is summarised onto one line,
+and remains on screen, so that the history of the dialogue gradually
+accumulates on the screen and is available for review, or for cut/paste.
+Also now included is the file-selector module Term::Clui::FileSelect,
+with its main subroutine &select_file.
 
 For the user, &edit and &view use the default EDITOR and PAGER from the
 user's environment, except that if &view is called with a very short
 text a builtin viewer is used allowing the user to choose whether the
-text remains on-screen or is cleared.  &choose uses arrow keys (or hjkl)
+text remains on-screen or is cleared.  &choose uses arrow keys or hjkl
 and return (or q to quit); if the choices won't fit on the screen, the
 user is asked for a substring clue. &confirm expects Y,y,N or n. &ask
 respects left and right arrows and backspace, ctrl-B moves to the beginning,
@@ -24,20 +25,23 @@ time then &choose highlights it as the default. Thus &choose manages
 its own defaults, and menus using Term::Clui autoconfigure themselves
 to the user's preferences.
 
+&select_file obeys options modelled after those of Tk::FileDialog.pm
+and Tk::SimpleFileSelect.pm
+
 As of version 1.11, the programmer can pass &ask a default string as
 an optional second argument. As of version 1.12, &choose handles big
-lists gracefully, asking the user for a substring clue (very cool and
-slick ...)
+lists gracefully, asking the user for a substring clue (very cool..)
+As of version 1.13, Term::Clui::FileSelect.pm is included.
 
 Term::Clui is fast,  very easy for both programmer and user, and has
 few external dependencies. It doesn't use curses which is a whole-of
 -screen interface; it uses a tiny  and very portable subset of vt100
 sequences (up left right normal reverse and clrtoeol).   It requires
-Exporter and flush.pl, which are core Perl.   It handles window size
-changes, using Term::Size.pm if available; if not, it tries `tput`.
+only Exporter, which is core Perl.   It handles window size changes,
+using Term::Size.pm if available; if not, it tries `tput`.
 
 An HTML equivalent is planned, offering similarly named routines for
-CGI scripts.
+CGI scripts, as is Tkui.pm doing the same for the GUI environment.
 
 To install:
    perl Makefile.PL
