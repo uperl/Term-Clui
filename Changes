@@ -24,3 +24,5 @@
 20041016 1.26 Install offers default locations as default to first-time users
 20041021 1.27 &choose handles multi-line question text
 20041107 1.28 EXPORT_OK routines documented and ALL tag defined
+20041208 1.29 ^C at the "give me a clue" prompt works like "q to quit"
+20050121 1.30 test.pl uses Test::Simple
