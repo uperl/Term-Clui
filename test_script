@@ -6,8 +6,8 @@
 #     This script is free software; you can redistribute it and/or      #
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
-require './Clui.raw'; import Term::Clui;
-require './FileSelect.raw'; import Term::Clui::FileSelect;
+require './Clui.pm'; import Term::Clui;
+require './FileSelect.pm'; import Term::Clui::FileSelect;
 
 while (1) {
 	my $task = &choose ('Test which Clui.pm subroutine ?',

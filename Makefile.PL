@@ -15,7 +15,7 @@ Use the arrow keys (or h,j,k,l) and <Return> to make your choices.
 
 EOT
 
-my $version = '1.13';
+my $version = '1.14';
 # my $bindir  = &bindir;
 my $libdir  = &libdir . '/Term';
 my $mandir  = &mandir;
@@ -232,7 +232,7 @@ sub check_kit {
 		'Makefile.PL', 7450,
 		'Clui.pm', 29416,
 		'FileSelect.pm', 8777,
-		'test_script', 6200,
+		'test_script', 6198,
 	);
 
 	my $problem_found = 0;
