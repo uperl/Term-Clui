@@ -5,7 +5,7 @@ use Config;
 &check_kit;
 
 my $libdir; my $man1dir; my $man3dir; my $comment; my $perlbin;
-my $version = '1.24';
+my $version = '1.25';
 ($libdir, $man1dir, $man3dir) = &defaults();
 
 if (! -t STDIN) {  # not interactive, use defaults ...
@@ -218,9 +218,9 @@ sub check_kit {
 
 	my %file_sizes = (
 		'README', 3026,
-		'Changes', 1424,
+		'Changes', 1488,
 		'MANIFEST', 121,
-		'Clui.pm', 34413,
+		'Clui.pm', 34367,
 		'Clui/FileSelect.pm', 8844,
 		'examples/test_script', 6994,
 		'examples/login_shell', 4703,

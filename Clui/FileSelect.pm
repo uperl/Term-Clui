@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.24';
+$VERSION = '1.25';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
@@ -168,7 +168,7 @@ and of Tk::SimpleFileSelect,
 but various new options are introduced, namely I<-TopDir>,
 I<-TextFile>, I<-Readable>, I<-Writeable>, I<-Executable> and I<-Owned>.
 
-This is Term::Clui::FileSelect.pm version 1.24,
+This is Term::Clui::FileSelect.pm version 1.25,
 #COMMENT#.
 
 =head1 SUBROUTINES

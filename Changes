@@ -20,3 +20,4 @@
 20040714 1.22 remove timeout for returning ESC (it fails on Fedora xterm)
 20040720 1.23 @marked gets correctly reset at each invocation of &choose
 20040801 1.24 &edit checks in initial RCS version correctly
+20040809 1.25 'tput lines' tried before 'tput rows' for all OSs

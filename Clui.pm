@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.24';
+$VERSION = '1.25';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -176,9 +176,7 @@ sub check_size {
 	if (! $size_changed) { return; }
 	if ($must_use_tput) {
 		$maxcols = `tput cols`;
-		if ($^O eq 'linux') { $maxrows = (`tput lines` + 0);
-		} else { $maxrows = (`tput rows` + 0);
-		}
+		$maxrows = (`tput lines` + 0) || (`tput rows` + 0);
 	} else {
 		($maxcols, $maxrows) = &Term::Size::chars(*STDERR);
 	}
@@ -862,7 +860,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.24,
+This is Term::Clui.pm version 1.25,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
