@@ -55,5 +55,5 @@ using Term::Size.pm if available; if not, it tries `tput`.
 An HTML equivalent is planned, offering similarly named routines for
 CGI scripts, as is Tkui.pm doing the same for the GUI environment.
 
-Peter Billam    computing@pjb.com.au    http://www.pjb.com.au
+Peter Billam    peter.billam@pjb.com.au    http://www.pjb.com.au
 

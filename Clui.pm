@@ -8,11 +8,12 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.17';
+$VERSION = '1.18';
+my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw(ask_password ask confirm choose edit sorry view);
-@EXPORT_OK = qw(beep tiview back_up get_default set_default);
+@EXPORT = qw(ask_password ask confirm choose edit sorry view inform);
+@EXPORT_OK = qw(beep tiview back_up get_default set_default timestamp);
 
 no strict; local $^W = 0;
 
@@ -27,11 +28,12 @@ $KEY_LEFT  = oct(404);
 $KEY_RIGHT = oct(405);
 $KEY_DOWN  = oct(402);
 $KEY_ENTER = "\r";
+$KEY_ENTER .= '';  # circumvent stupid bloody -w warning
 $KEY_PPAGE = oct(523);
 $KEY_NPAGE = oct(522);
 $KEY_BTAB  = oct(541);
 
-$bsd = (-f "/kernel" || -f "/vmunix" || -f "/386bsd");
+# $bsd = (-f "/kernel" || -f "/vmunix" || -f "/386bsd");
 
 my $irow; my $icol;   # maintained by &puts, &up, &down, &left and &right
 sub puts   { my $s = join '', @_;
@@ -52,6 +54,11 @@ sub attrset { my $attr = $_[$[];
 sub beep     { print TTY "\07"; }
 sub clear    { print TTY "\033[H\033[J"; }
 sub clrtoeol { print TTY "\033[K"; }
+sub black    { print TTY "\033[30m"; }
+sub red      { print TTY "\033[31m"; }
+sub green    { print TTY "\033[32m"; }
+sub blue     { print TTY "\033[34m"; }
+sub violet   { print TTY "\033[35m"; }
 sub getch {
 	local ($c);
 	$c = getc(TTYIN);
@@ -123,7 +130,6 @@ sub goto { my $newcol = shift; my $newrow = shift;
 	}
 }
 sub move { local ($ix,$iy) = @_; printf TTY "\033[%d;%dH",$iy+1,$ix+1; }
-sub beep { print TTY "\07"; }
 my $initscr_already_run = 0; my $stty = '';
 sub initscr {
 	if ($initscr_already_run) {
@@ -133,7 +139,7 @@ sub initscr {
 	$stty = `stty -g`; chop $stty;
 	open(TTYIN, "</dev/tty") || (warn "Can't read /dev/tty: $!\n", return 0);
 
-	if ($^O eq 'FreeBSD') { system("stty -echo -icrnl raw </dev/tty");
+	if ($^O =~ /^FreeBSD$/i) { system("stty -echo -icrnl raw </dev/tty");
 	} else { system("stty -echo -icrnl raw </dev/tty >/dev/tty");
 	}
 	# system("stty -echo -icrnl raw </dev/tty");  # various old tries ...
@@ -149,7 +155,7 @@ sub endwin {
 	print TTY "\033[0m";
 	if ($initscr_already_run > 1) { $initscr_already_run--; return; }
 	close TTY; close TTYIN;
-	if ($^O eq 'FreeBSD') { system("stty $stty </dev/tty") if $stty;
+	if ($^O =~ /^FreeBSD$/i) { system("stty $stty </dev/tty") if $stty;
 	} else { system("stty $stty </dev/tty >/dev/tty") if $stty;
 	}
 	$initscr_already_run = 0;
@@ -179,6 +185,11 @@ sub check_size {
 $SIG{'WINCH'} = sub { $size_changed = 1; };
 
 # ------------------------ ask stuff -------------------------
+
+# Options such as integer, real, positive, >x, >=x, <x <=x,
+# non-null, max-length, min-length, silent  ...
+# default could be just one more option, and backward compatibilty
+# could be preserved by checking whether the 2nd arg is a hashref ...
 
 sub ask_password { # no echo - use for passwords
 	local ($silent) = 'yes'; &ask ($_[$[]);
@@ -367,7 +378,7 @@ sub wr_cell { my $i = shift;
 	if ($i == $this_cell) { &attrset($A_REVERSE); }
 	my $no_tabs = $list[$i];
 	$no_tabs =~ s/\t/ /;
-	$no_tabs =~ s/^(.{1,77}).*/\1/;
+	$no_tabs =~ s/^(.{1,77}).*/$1/;
 	&puts(" $no_tabs ");
 	if ($marked[$i] || $i == $this_cell) { &attrset($A_NORMAL); }
 	$icol += length ($no_tabs) + 2;
@@ -592,14 +603,22 @@ sub logit { local ($file, $msg) = @_;
 sub timestamp {
    # returns current date and time in "199403011 113520" format
    local ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-   sprintf ("%4.4d%2.2d%2.2d %2.2d%2.2d%2.2d",
+	$wday += 0; $yday += 0; $isdst += 0; # avoid bloody -w warning
+   return sprintf ("%4.4d%2.2d%2.2d %2.2d%2.2d%2.2d",
       $year+1900, $mon+1, $mday, $hour, $min, $sec);
 }
 
 # ----------------------- sorry stuff -------------------------
 
-sub sorry {  local ($text) = @_;  # warns user of an error condition
-	print STDERR "Sorry, $text\n";
+sub sorry { # warns user of an error condition
+	print STDERR "Sorry, $_[$[]\n";
+}
+
+sub inform { my $text = $_[$[];
+	$text =~ s/([^\n])$/$1\n/s;
+	if (open(TTY, ">/dev/tty")) { print TTY $text; close TTY;
+	} else { warn $text;
+	}
 }
 
 # ----------------------- view stuff -------------------------
@@ -785,7 +804,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.17,
+This is Term::Clui.pm version 1.18,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
@@ -877,6 +896,12 @@ Uses RCS if directory RCS/ exists
 
 Similar to I<warn "Sorry, $message\n";>
 
+=item I<inform>( $message );
+
+Similar to I<warn "$message\n";> except that it doesn't add the
+newline at the end if there already is one,
+and it uses I</dev/tty> rather than I<STDERR> if it can.
+
 =item I<view>( $title, $text );  OR  I<view>( $filename );
 
 If the I<$text> is longer than a screenful, uses the environment
@@ -908,12 +933,12 @@ HOME, LOGDIR, EDITOR and PAGER, if they are set.
 
 =head1 AUTHOR
 
-Peter J Billam <computing@pjb.com.au>
+Peter J Billam <peter.billam@pjb.com.au>
 
 =head1 CREDITS
 
 Based on some old perl 4 libraries, I<ask.pl>, I<choose.pl>,
-I<confirm.pl>, I<edit.pl>, I<sorry.pl> and I<view.pl>,
+I<confirm.pl>, I<edit.pl>, I<sorry.pl>, I<inform.pl> and I<view.pl>,
 which were in turn based on some even older curses-based programs in I<C>.
 
 =head1 SEE ALSO

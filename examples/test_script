@@ -135,7 +135,7 @@ EOT
 }
 
 sub test_view {
-	&view('Your limerick:', 'gloop');
+	&view('Your limerick:', $text||'try testing "ask" and "edit" first :-)');
 }
 
 sub test_select_file {
