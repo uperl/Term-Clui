@@ -17,3 +17,5 @@
 20040708 1.21 examples/test_script defaults to installed Clui.pm
 20040709 &choose does multiple choice if called in array context
 20040711 get_default and set_default handle arrays with $; but not used yet
+20040714 1.22 remove timeout for returning ESC (it fails on Fedora xterm)
+20040720 1.23 @marked gets correctly reset at each invocation
