@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.26';
+$VERSION = '1.27';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -32,8 +32,6 @@ $KEY_ENTER .= '';  # circumvent stupid bloody -w warning
 $KEY_PPAGE = oct(523);
 $KEY_NPAGE = oct(522);
 $KEY_BTAB  = oct(541);
-
-# $bsd = (-f "/kernel" || -f "/vmunix" || -f "/386bsd");
 
 my $irow; my $icol;   # maintained by &puts, &up, &down, &left and &right
 sub puts   { my $s = join '', @_;
@@ -168,6 +166,7 @@ sub endwin {
 # ----------------------- size handling ----------------------
 
 my ($must_use_tput, $maxcols, $maxrows); my $size_changed = 1;
+my ($otherlines, @otherlines, $notherlines);
 
 eval 'require "Term/Size.pm"';
 if ($@) { $must_use_tput = 1; }
@@ -182,6 +181,10 @@ sub check_size {
 	}
 	$maxcols = $maxcols || 80; $maxcols--;
 	$maxrows = $maxrows || 24;
+	if ($notherlines) {
+		@otherlines = &fmt($otherlines);
+		$notherlines = scalar @otherlines;
+	}
 	$size_changed = 0;
 }
 $SIG{'WINCH'} = sub { $size_changed = 1; };
@@ -200,7 +203,7 @@ sub ask { my ($question, $default) = @_;
 	return '' unless $question;
 	&initscr(); my $nol = &display_question($question);
 
-   my $i = 0; my $n = 0; my @s = (); # cursor position, length, string
+	my $i = 0; my $n = 0; my @s = (); # cursor position, length, string
 	if ($default) {
 		$default =~ s/\t/	/g;
 		@s = split ('', $default); $n = scalar @s; $i = $[;
@@ -262,7 +265,8 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 
 	$question =~ s/^[\n\r]+//;   # strip initial newline(s)
 	$question =~ s/[\n\r]+$//;   # strip final newline(s)
-	my ($firstline,$otherlines) = split ("\n", $question, 2);
+	my $firstline;
+	($firstline,$otherlines) = split ("\n", $question, 2);
 	my $firstlinelength = length $firstline;
 
 	$choice = &get_default($firstline);
@@ -270,6 +274,8 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 
 	&initscr();
 	&size_and_layout(0);
+	@otherlines = &fmt($otherlines);
+	$notherlines = scalar @otherlines;
 	if (wantarray) {
 		$#marked = $#list;
 		if ($firstlinelength < $maxcols-30) {
@@ -304,7 +310,7 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 					@list = &narrow_the_search(@biglist); &wr_screen(); next;
 				} else {
 					&up(1); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
-         		return wantarray ? () : undef;
+					return wantarray ? () : undef;
 				}
 			}
 			&goto (0,0); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
@@ -404,8 +410,8 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 			}
 		}
 	}
-	warn "choose: shouldn't reach here ...\n";
 	&endwin ();
+	warn "choose: shouldn't reach here ...\n";
 }
 sub layout { my @list = @_;
 	$this_cell = 0; my $irow = 1; my $icol = 0;  my $i;
@@ -423,6 +429,9 @@ sub wr_screen {
 	my $i;
 	for ($i=$[; $i<=$#list; $i++) {
 		&wr_cell($i, $this_cell) unless $i==$this_cell;
+	}
+	if ($notherlines && ($nrows+$notherlines) < $maxrows) {
+		&puts("\r\n", join("\r\n", @otherlines), "\r");
 	}
 	&wr_cell($this_cell);
 }
@@ -658,11 +667,11 @@ sub logit { my ($file, $msg) = @_;
 	}
 }
 sub timestamp {
-   # returns current date and time in "199403011 113520" format
-   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+	# returns current date and time in "199403011 113520" format
+	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
 	$wday += 0; $yday += 0; $isdst += 0; # avoid bloody -w warning
-   return sprintf ("%4.4d%2.2d%2.2d %2.2d%2.2d%2.2d",
-      $year+1900, $mon+1, $mday, $hour, $min, $sec);
+	return sprintf ("%4.4d%2.2d%2.2d %2.2d%2.2d%2.2d",
+		$year+1900, $mon+1, $mday, $hour, $min, $sec);
 }
 
 # ----------------------- sorry stuff -------------------------
@@ -670,7 +679,6 @@ sub timestamp {
 sub sorry { # warns user of an error condition
 	print STDERR "Sorry, $_[$[]\n";
 }
-
 sub inform { my $text = $_[$[];
 	$text =~ s/([^\n])$/$1\n/s;
 	if (open(TTY, ">/dev/tty")) { print TTY $text; close TTY;
@@ -766,37 +774,37 @@ sub fmt { my $text = shift; my %options = @_;
 	my (@i_lines, $initial_space);
 	@i_lines = split (/\r?\n/, $text);
 	foreach $i_line (@i_lines) {
-   	if ($i_line =~ /^\s*$/) {   # blank line ?
-      	if ($o_line) { push @o_lines, $o_line; $o_line=''; $o_length=0; }
-      	if (! $last_line_empty) { push @o_lines,""; $last_line_empty=1; }
-      	next;
-   	}
-   	$last_line_empty = 0;
+		if ($i_line =~ /^\s*$/) {   # blank line ?
+			if ($o_line) { push @o_lines, $o_line; $o_line=''; $o_length=0; }
+			if (! $last_line_empty) { push @o_lines,""; $last_line_empty=1; }
+			next;
+		}
+		$last_line_empty = 0;
 
 		if ($options{nofill}) {
 			push @o_lines, substr($i_line, $[, $maxcols); next;
-   	}
+		}
 		if ($i_line =~ s/^(\s+)//) {   # line begins with space ?
 			$initial_space = $1; $initial_space =~ s/\t/   /g;
-      	if ($o_line) { push @o_lines, $o_line; }
-      	$o_line = $initial_space; $o_length = length $initial_space;
-   	} else {
+			if ($o_line) { push @o_lines, $o_line; }
+			$o_line = $initial_space; $o_length = length $initial_space;
+		} else {
 			$initial_space = '';
 		}
 
-   	@i_words = split (' ', $i_line);
-   	foreach $i_word (@i_words) {
-      	$w_length = length $i_word;
-      	if (($o_length + $w_length) > $maxcols) {
-         	push @o_lines, $o_line;
+		@i_words = split (' ', $i_line);
+		foreach $i_word (@i_words) {
+			$w_length = length $i_word;
+			if (($o_length + $w_length) > $maxcols) {
+				push @o_lines, $o_line;
 				$o_line = $initial_space; $o_length = length $initial_space;
-      	}
-      	if ($w_length > $maxcols) {  # chop it !
+			}
+			if ($w_length > $maxcols) {  # chop it !
 				push @o_lines, substr($i_word,$[,$maxcols); next;
 			}
-      	if ($o_line) { $o_line .= ' '; $o_length += 1; }
-      	$o_line .= $i_word; $o_length += $w_length;
-   	}
+			if ($o_line) { $o_line .= ' '; $o_length += 1; }
+			$o_line .= $i_word; $o_length += $w_length;
+		}
 	}
 	if ($o_line) { push @o_lines, $o_line; }
 	if ((scalar @o_lines) < $maxrows-2) { return (@o_lines);
@@ -823,6 +831,7 @@ Term::Clui.pm - Perl module offering a Command-Line User Interface
 	use Term::Clui;
 	$chosen = &choose('A Title', @a_list);  # single choice
 	@chosen = &choose('A Title', @a_list);  # multiple choice
+	$x = &choose("Which ?\n(Arrow-keys and Return)", @w); # multi-line question
 	if (&confirm($text)) { &do_something(); };
 	$answer = &ask($question);
 	$answer = &ask($question,$suggestion);
@@ -860,7 +869,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.26,
+This is Term::Clui.pm version 1.27,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
@@ -943,6 +952,17 @@ a substring as a clue. As soon as the matching items will fit,
 they are displayed to be chosen as normal. If the user pressed "q"
 at this choice, they are asked if they wish to change their substring
 clue; if they reply "n" to this, choose quits and returns I<undefined>.
+
+If the $question is multi-line,
+The first line is put at the top as usual with the choices
+arranged beneath it; the subsequent lines are formatted within the
+screen width and displayed at the bottom.
+After the choice is made all but the first line is erased,
+and the first line remains on-screen with the choice appended after it.
+You should therefore try to arrange multi-line questions
+so that the first line is the question in short form,
+and subsequent lines are explanation and elaboration.
+
 
 =item I<confirm>( $question );
 

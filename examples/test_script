@@ -6,17 +6,17 @@
 #     This script is free software; you can redistribute it and/or      #
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
-eval "require 'Term/Clui.pm'";
-if ($@) { eval "require './Clui.pm'"; }
+eval "require './Term/Clui.pm'";
 if ($@) { eval "require '../Clui.pm'"; }
-if ($@) { die "can't find Clui.pm in INC path, this dir, or parent dir\n"; }
+if ($@) { eval "require 'Clui.pm'"; }
+if ($@) { die "can't find Clui.pm in this dir, parent dir, or INC path\n"; }
 import Term::Clui;
 
-eval "require 'Term/Clui/FileSelect.pm'";
-if ($@) { eval "require './Clui/FileSelect.pm'"; }
+eval "require './Term/Clui/FileSelect.pm'";
 if ($@) { eval "require '../Clui/FileSelect.pm'"; }
+if ($@) { eval "require 'Clui/FileSelect.pm'"; }
 if ($@) {
-	die "can't find FileSelect.pm in INC path, this dir, or parent dir\n";
+	die "can't find FileSelect.pm in this dir, parent dir, or INC path\n";
 }
 import Term::Clui::FileSelect;
 
@@ -87,7 +87,9 @@ sub test_choose {
 Your favourite colour ?
 
 This tests how the 'choose' subroutine handles multi-line
-questions ...
+questions. After you choose, all but the first line should disappear,
+leaving the question and answer on the screen as a record of the dialogue.
+The other lines should only get displayed if there is room.
 EOT
 		warn "paint=$paint, scientist=$scientist, colour=$colour\n";
 	} else {

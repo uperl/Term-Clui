@@ -22,3 +22,4 @@
 20040801 1.24 &edit checks in initial RCS version correctly
 20040809 1.25 'tput lines' tried before 'tput rows' for all OSs
 20041016 1.26 Install offers default locations as default to first-time users
+20041021 1.27 &choose handles multi-line question text
