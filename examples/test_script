@@ -6,7 +6,7 @@
 #     This script is free software; you can redistribute it and/or      #
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
-eval "require 'Term/Clui.pm'";
+eval "require 'Test/Clui.pm'";
 if ($@) { eval "require './Clui.pm'"; }
 if ($@) { eval "require '../Clui.pm'"; }
 if ($@) { die "can't find Clui.pm in INC path, this dir, or parent dir\n"; }

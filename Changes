@@ -11,3 +11,5 @@
 20030701 1.18 FreeBSD bug corrected ($^O now gives freebsd)
 20030912 debug warn statements removed from FileSelect.pm
 20031103 1.19 bug fixed handling DOWN in &choose
+20031214 select used in &getch to return ESC promptly
+20040520 1.20 minor doc fix for FileSelect, contact.html not email address

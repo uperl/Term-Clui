@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.19';
+$VERSION = '1.20';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -59,10 +59,13 @@ sub red      { print TTY "\033[31m"; }
 sub green    { print TTY "\033[32m"; }
 sub blue     { print TTY "\033[34m"; }
 sub violet   { print TTY "\033[35m"; }
+my ($rin, $nfound, $timeleft);  # for use by select
 sub getch {
-	local ($c);
-	$c = getc(TTYIN);
+	my $c = getc(TTYIN);
 	if ($c eq "\033") {
+		($nfound, $timeleft) = select($rout=$rin, undef, undef, 0.05);
+		# warn "nfound=$nfound\n";  # always 0 on FreeBSD's cons25l1 :-(
+		if (! $nfound) { return "\033"; }
 		$c = getc(TTYIN);
 		if ($c eq "A") { return($KEY_UP); }
 		if ($c eq "B") { return($KEY_DOWN); }
@@ -129,7 +132,7 @@ sub goto { my $newcol = shift; my $newrow = shift;
 	} elsif ($newrow < $irow) { &up   ($irow-$newrow);
 	}
 }
-sub move { local ($ix,$iy) = @_; printf TTY "\033[%d;%dH",$iy+1,$ix+1; }
+sub move { my ($ix,$iy) = @_; printf TTY "\033[%d;%dH",$iy+1,$ix+1; }
 my $initscr_already_run = 0; my $stty = '';
 sub initscr {
 	if ($initscr_already_run) {
@@ -149,6 +152,7 @@ sub initscr {
 	# }
 
 	select((select(TTY), $| = 1)[$[]); print TTY "";
+	$rin = ''; vec($rin, fileno(TTYIN), 1) = 1;
 	$icol = 0; $irow = 0; $initscr_already_run = 1;
 }
 sub endwin {
@@ -194,7 +198,7 @@ $SIG{'WINCH'} = sub { $size_changed = 1; };
 sub ask_password { # no echo - use for passwords
 	local ($silent) = 'yes'; &ask ($_[$[]);
 }
-sub ask { local ($question, $default) = @_;
+sub ask { my ($question, $default) = @_;
 	return '' unless $question;
 	&initscr(); my $nol = &display_question($question);
 
@@ -227,7 +231,7 @@ sub ask { local ($question, $default) = @_;
 		} elsif ($c eq "\cE") { &right($n-$i); $i = $n;
 		} elsif ($c eq "\cL") {  # redraw ...
 		} elsif ($c > 255) { &beep();
-		} elsif ($c =~ /^[\032-\376]$/) {
+		} elsif ($c =~ /^[\040-\376]$/) {
 			splice(@s, $i, 0, $c);
 			$n++; $i++; &puts($silent ? "x" : $c);
 			foreach $j ($i .. $n) { &puts($s[$j]); }
@@ -250,7 +254,7 @@ my (%irow, %icol, $nrows, $clue_has_been_given, $choice, $this_cell);
 my $HOME = $ENV{'HOME'} || $ENV{'LOGDIR'} || (getpwuid($<))[7];
 srand(time() ^ ($$+($$<15)));
 
-sub choose {  local ($question, @list) = @_;
+sub choose {  local ($question, @list) = @_;  # @list must be local
 	# If called in array context, should probably allow multiple choice,
    # though this would be incompatible with the Tk widgets that would be
    # implementing &choose in a GUI environment ...
@@ -265,7 +269,8 @@ sub choose {  local ($question, @list) = @_;
 
 	$choice = &get_default($firstline);
 
-	&initscr (); &puts("$firstline\r\n");  &size_and_layout(0);
+	&initscr(); &puts("$firstline\r\n");
+	&size_and_layout(0);
 	if ($nrows >= $maxrows) { @list = &narrow_the_search(@list); }
 	&wr_screen();
 
@@ -383,9 +388,10 @@ sub wr_cell { my $i = shift;
 	if ($marked[$i] || $i == $this_cell) { &attrset($A_NORMAL); }
 	$icol += length ($no_tabs) + 2;
 }
-sub size_and_layout { my $erase_rows = shift;
+sub size_and_layout {
+	my $erase_rows = shift;
 	my $oldmaxrows = $maxrows;
-	&check_size;
+	&check_size();
 	if ($erase_rows) {
 		if ($erase_rows > $maxrows) { $erase_rows = $maxrows; } # XXX?
 		&erase_lines(1);
@@ -419,7 +425,7 @@ sub narrow_the_search { my @biglist = @_;
 		} elsif ($c eq "\cL") {
 
 		} elsif ($c > 255) { &beep();
-		} elsif ($nchoices && $c =~ /^[\032-\376]$/) {
+		} elsif ($nchoices && $c =~ /^[\040-\376]$/) {
 			splice(@s, $i, 0, $c);
 			$n++; $i++; &puts($c);
 			foreach $j ($i..$n) { &puts($s[$j]); } &clrtoeol();  &left($n-$i);
@@ -518,8 +524,8 @@ sub confirm { my $question = shift;  # asks user Yes|No, returns 1|0
 
 # ----------------------- edit stuff -------------------------
 
-sub edit {	local ($title, $text) = @_;
-	$argc = $#_ - $[ +1;
+sub edit {	my ($title, $text) = @_;
+	my $argc = $#_ - $[ +1;
 	my ($dirname, $basename, $rcsdir, $rcsfile, $rcs_ok);
 	
 	if ($argc == 0) {	# start editor session with no preloaded file
@@ -537,7 +543,7 @@ sub edit {	local ($title, $text) = @_;
 		undef $/; $text = <F>; $/ = "\n";
 		close F; unlink $file; return $text;
 	} elsif ($argc == 1) {	# its a file, we will try RCS ...
-		local ($file) = $title;
+		my $file = $title;
 
 		# weed out no-go situations
 		if (-d $file)  { &sorry ("$file is already a directory\n"); return 0; }
@@ -589,7 +595,7 @@ sub edit {	local ($title, $text) = @_;
 		}
 	}
 }
-sub logit { local ($file, $msg) = @_;
+sub logit { my ($file, $msg) = @_;
 	if (! open (LOG, ">> $rcslog")) {  warn "can't open $rcslog: $!\n";
 	} else {
 		$pid = fork;	# log in background for better response time
@@ -602,7 +608,7 @@ sub logit { local ($file, $msg) = @_;
 }
 sub timestamp {
    # returns current date and time in "199403011 113520" format
-   local ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
 	$wday += 0; $yday += 0; $isdst += 0; # avoid bloody -w warning
    return sprintf ("%4.4d%2.2d%2.2d %2.2d%2.2d%2.2d",
       $year+1900, $mon+1, $mday, $hour, $min, $sec);
@@ -626,14 +632,14 @@ sub inform { my $text = $_[$[];
 foreach $f ("/usr/bin/less", "/usr/bin/more") {
 	if (-x $f) { $default_pager = $f; }
 }
-sub view {	local($title, $text) = @_;	# or ($filename) =
+sub view {	my ($title, $text) = @_;	# or ($filename) =
 	if (! $text && -T $title && open(F,"< $title")) {
 		$nlines = 0;
 		while (<F>) { last if ($nlines++ > $maxrows); } close F;
 		if ($nlines > (0.6*$maxrows)) {
 			system (($ENV{PAGER} || $default_pager) . " \'$title\'");
 		} else {
-			open (F,"< $title"); undef $/; local($text)=<F>; $/="\n"; close F;
+			open (F,"< $title"); undef $/; $text=<F>; $/="\n"; close F;
 			&tiview($title, $text);
 		}
 	} else {
@@ -651,44 +657,41 @@ sub view {	local($title, $text) = @_;	# or ($filename) =
 		}
 	}
 }
-sub tiview {	local ($title, $text) = @_;
+sub tiview {	my ($title, $text) = @_;
 	return unless $text; local ($[) = 0;
-	$title =~ s/\t/ /g; local ($titlelength) = length $title;
+	$title =~ s/\t/ /g; my $titlelength = length $title;
 	
-	&check_size;
-	local @rows = &fmt($text, nofill=>1);
+	&check_size();
+	my @rows = &fmt($text, nofill=>1);
 	&initscr();
 	if (3 > scalar @rows) {
-		&puts(join("\r\n", @rows), "\r\n"); &endwin(); return 1;
+		&puts(join("\r\n",@rows), "\r\n"); &endwin(); return 1;
 	}
 	if ($titlelength > ($maxcols-35)) { &puts ("$title\r\n");
 	} else { &puts ("$title   (<enter> to continue, q to clear)\r\n");
 	}
-	&wr_screen_tiview();
+	&puts("\r", join("\e[K\r\n",@rows), "\r");
+	$icol = 0; $irow = scalar @rows; &goto ($titlelength+1, 0);
 	
 	while (1) {
 		$c = &getch();
 		if ($c eq 'q' || $c eq "\cX" || $c eq "\cW" || $c eq "\cZ"
 		|| $c eq "\cC" || $c eq "\c\\") {
-			&erase_lines(0); &endwin (); return 1;
+			&erase_lines(0); &endwin(); return 1;
 		} elsif ($c eq "\r") {  # <enter> retains text on screen
-			&clrtoeol; &goto (0, @rows+1); &endwin(); return 1;
+			&clrtoeol(); &goto (0, @rows+1); &endwin(); return 1;
 		} elsif ($c eq "\cL") {
-			&puts("\r"); &endwin; &tiview($title,$text); return 1;
+			&puts("\r"); &endwin(); &tiview($title,$text); return 1;
 		}
 	}
 	warn "tiview: shouldn't reach here\n";
-}
-sub wr_screen_tiview {
-	&puts("\r", join("\e[K\r\n",@rows), "\r");
-	$icol = 0; $irow = scalar @rows; &goto ($titlelength+1, 0);
 }
 
 # -------------------------- infrastructure -------------------------
 
 sub display_question {   my $question = shift; my %options = @_;
 	# used by &ask and &confirm, but not by &choose ...
-	&check_size;
+	&check_size();
 	my ($firstline, @otherlines);
 	if ($options{nofirstline}) {
 		@otherlines = &fmt($question);
@@ -804,7 +807,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.19,
+This is Term::Clui.pm version 1.20,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
@@ -933,7 +936,7 @@ HOME, LOGDIR, EDITOR and PAGER, if they are set.
 
 =head1 AUTHOR
 
-Peter J Billam <peter.billam@pjb.com.au>
+Peter J Billam www.pjb.com.au/comp/contact.html
 
 =head1 CREDITS
 

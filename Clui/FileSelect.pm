@@ -8,8 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.19';
-# use Term::Clui;
+$VERSION = '1.20';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
@@ -154,6 +153,7 @@ Term::Clui::FileSelect.pm - Perl module to ask the user to select a file.
 
 =head1 SYNOPSIS
 
+  use Term::Clui;
   use Term::Clui::FileSelect;
   $file = &select_file(-Readable=>1, -TopDir=>'/home/www', -FPat='*.html');
 
@@ -168,7 +168,7 @@ and of Tk::SimpleFileSelect,
 but various new options are introduced, namely I<-TopDir>,
 I<-TextFile>, I<-Readable>, I<-Writeable>, I<-Executable> and I<-Owned>.
 
-This is Term::Clui::FileSelect.pm version 1.19,
+This is Term::Clui::FileSelect.pm version 1.20,
 #COMMENT#.
 
 =head1 SUBROUTINES
@@ -266,7 +266,7 @@ They are I<Create New File>, I<Show DotFiles> and I<Hide DotFiles>
 
 =head1 AUTHOR
 
-Peter J Billam <peter@pjb.com.au>
+Peter J Billam www.pjb.com.au/comp/contact.html
 
 =head1 CREDITS
 

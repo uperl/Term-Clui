@@ -11,6 +11,9 @@ use Term::Clui;
 # require '../Clui.pm'; import Term::Clui;
 my $home = $ENV{'HOME'} || $ENV{'LOGDIR'}  || (getpwuid($<))[7];
 my $user = $ENV{'USER'} || $ENV{'LOGNAME'} || (getpwuid($<))[0];
+my @path = split ':', $ENV{PATH};
+my $browser = '';
+my $mailer = '';
 use Cwd; my $dir = cwd();
 
 while (1) {
@@ -39,7 +42,18 @@ sub Config {
 	&edit("$home/$file");
 }
 sub Browser {
-	system '/usr/bin/lynx';  # w3m ?
+	if (! $browser) {
+		my ($bin, $prog);
+		DIR: foreach $bin (@path) {
+			foreach $prog ('lynx', 'w3m', 'links') {
+				if (-e "$bin/$prog") { $browser = "$bin/$prog"; last DIR; }
+			}
+		}
+	}
+	if (! $browser) {
+		&sorry("can't find a browser: tried lynx, w3m and links") ; return;
+	}
+	system $browser;
 }
 sub Change_directory {
 	my $newdir = &ask('to which directory ?');
@@ -83,7 +97,18 @@ sub FTP {
 	}
 }
 sub Mail {
-	system 'pine';  # /usr/bin/elm ?
+	if (! $mailer) {
+		my ($bin, $prog);
+		DIR: foreach $bin (@path) {
+			foreach $prog ('pine', 'elm') {
+				if (-e "$bin/$prog") { $mailer = "$bin/$prog"; last DIR; }
+			}
+		}
+	}
+	if (! $mailer) {
+		&sorry("can't find a mailer: tried pine and elm") ; return;
+	}
+	system $mailer;
 }
 sub Make {
 	if (!open(F,'./Makefile')) { &sorry("can't open Makefile: $!"); return; }
