@@ -8,12 +8,13 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.27';
+$VERSION = '1.28';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw(ask_password ask confirm choose edit sorry view inform);
 @EXPORT_OK = qw(beep tiview back_up get_default set_default timestamp);
+%EXPORT_TAGS = (ALL => [@EXPORT,@EXPORT_OK]);
 
 no strict; local $^W = 0;
 
@@ -869,7 +870,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.27,
+This is Term::Clui.pm version 1.28,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
@@ -1001,6 +1002,41 @@ after it, if the user presses 'q' the text is erased.
 
 =back
 
+=head1 EXPORT_OK SUBROUTINES
+
+The following routines are not exported by default, but are
+exported under the I<ALL> tag, so if you need them you should:
+
+ import Term::Clui qw(:ALL);
+
+=over 3
+
+=item I<beep>()
+
+Beeps.
+
+=item I<timestamp>()
+
+Returns a sortable timestamp string in "YYYYMMDD hhmmss" form.
+
+=item I<get_default>( $question )
+
+Consults the database I<~/.clui_dir/choices> or
+I<$ENV{CLUI_DIR}/choices> and returns the choice that
+the user made the last time this question was asked.
+Is is better than opening the database directly
+as it handles DBM's problem with concurrent accesses.
+
+=item I<set_default>( $question, $new_default )
+
+Opens the database I<~/.clui_dir/choices> or
+I<$ENV{CLUI_DIR}/choices> and sets the default response which will
+be offered to the user made the next time this question is asked.
+Is is better than opening the database directly
+as it handles DBM's problem with concurrent accesses.
+
+=back
+
 =head1 DEPENDENCIES
 
 It requires Exporter, which is core Perl.
@@ -1010,12 +1046,12 @@ if not, it tries `tput` before guessing 80x24.
 =head1 ENVIRONMENT
 
 The environment variable I<CLUI_DIR> can be used (by programmer or user)
-to set the directory in which I<&choose> keeps its database of default choices.
-The default directory (changed at version 1.17) is now I<~/.clui_dir>
-and the whole default database mechanism can be disabled by
+to override I<~/.clui_dir> as the directory in which I<&choose> keeps
+its database of previous choices.
+The whole default database mechanism can be disabled by
 I<CLUI_DIR = OFF> if you really want to :-(
 
-I<Clui.pm> also consults the environment variables
+I<Term::Clui> also consults the environment variables
 HOME, LOGDIR, EDITOR and PAGER, if they are set.
 
 =head1 AUTHOR
