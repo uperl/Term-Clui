@@ -5,12 +5,12 @@ use Config;
 &check_kit;
 
 my $libdir; my $man1dir; my $man3dir; my $comment; my $perlbin;
-my $version = '1.15';
+my $version = '1.16';
 ($libdir, $man1dir, $man3dir) = &defaults();
 
 if (! -t STDIN) {  # not interactive, use defaults ...
 	if (! $libdir) { die "Sorry, can't write to $libdir\n"; }
-	&install($libdir, $man1dir, $man3dir);
+	&install("$libdir/Term", $man1dir, $man3dir);
 	exit 0;
 }
 
@@ -20,14 +20,14 @@ if ($libdir) {
 	if ($choice eq 'Cancel') { exit 0; }
 	if ($choice eq 'using system default locations') {
 		if (! $libdir) { die "Sorry, can't write to $libdir\n"; }
-		&install($libdir, $man1dir, $man3dir);
+		&install("$libdir/Term", $man1dir, $man3dir);
 		exit 0;
 	}
 }
 
-$libdir  = &libdir . '/Term';
+$libdir  = &libdir();
 ($man1dir, $man3dir)  = &mandir;
-&install($libdir, $man1dir, $man3dir);
+&install("$libdir/Term", $man1dir, $man3dir);
 exit 0;
 
 # --------------------- infrastructure ---------------------
@@ -49,10 +49,10 @@ sub install {  my ($libdir, $man1dir, $man3dir) = @_;
 	if (! $perlbin) { die "Sorry, no perl in PATH\n"; }
 
 	@localised_lib = &localise('Clui.pm');
-	print STDERR "installing $libdir/Clui.pm ...";
+	my $target = "$libdir/Clui.pm";
+	print STDERR "installing $target ...";
 	if (!-d $libdir) { mkdir $libdir, 0755; }
 	chmod 0755, $libdir;
-	my $target = "$libdir/Tea.pm";
 	if (! open (P, "> $target")) { die "\nSorry, can't open $target: $!\n"; }
 	print P @localised_lib;  close P;
 	chmod 0644, $target;
@@ -71,10 +71,10 @@ sub install {  my ($libdir, $man1dir, $man3dir) = @_;
 	}
 
 	@localised_lib = &localise('Clui/FileSelect.pm');
-	print STDERR "installing $libdir/Clui/FileSelect.pm ...";
+	$target = "$libdir/Clui/FileSelect.pm";
+	print STDERR "installing $target ...";
 	if (!-d "$libdir/Clui") { mkdir "$libdir/Clui", 0755; }
 	chmod 0755, "$libdir/Clui";
-	my $target = "$libdir/Clui/FileSelect.pm";
 	if (! open (P, "> $target")) { die "\nSorry, can't open $target: $!\n"; }
 	print P @localised_lib;  close P;
 	chmod 0644, $target;
@@ -218,9 +218,9 @@ sub check_kit {
 
 	my %file_sizes = (
 		'README', 2790,
-		'Changes', 405,
+		'Changes', 480,
 		'MANIFEST', 121,
-		'Clui.pm', 29394,
+		'Clui.pm', 29542,
 		'Clui/FileSelect.pm', 8832,
 		'examples/test_script', 6569,
 	);

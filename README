@@ -1,4 +1,4 @@
-       The Command-Line User Interface     Term::Clui   1.15
+       The Command-Line User Interface     Term::Clui   1.16
 
 Term::Clui offers a high-level user interface, with subroutines &choose
 &ask &edit &view &confirm and &sorry. It works at a higher level than

@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.15';
+$VERSION = '1.16';
 require Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw(ask_password ask confirm choose edit sorry view);
@@ -599,6 +599,9 @@ sub tiview {	local ($title, $text) = @_;
 	&check_size;
 	local @rows = &fmt($text, nofill=>1);
 	&initscr();
+	if (3 > scalar @rows) {
+		&puts(join("\r\n", @rows), "\r\n"); &endwin(); return 1;
+	}
 	if ($titlelength > ($maxcols-35)) { &puts ("$title\r\n");
 	} else { &puts ("$title   (<enter> to continue, q to clear)\r\n");
 	}
@@ -742,7 +745,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.15,
+This is Term::Clui.pm version 1.16,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
@@ -830,13 +833,13 @@ Similar to I<warn "Sorry, $message\n";>
 
 =item I<view>( $title, $text );  OR  I<view>( $filename );
 
-If the I<$text> is longer than a screenful,
-uses the environment variable PAGER ( or I<less> ) to display it;
-if it is shorter, uses a simple built-in routine which 
-expects either 'q' or I<Return> from the user.
-If the user presses I<Return> the displayed text remains on the screen
-and the dialogue continues after it;
-if the user presses 'q' the text is erased.
+If the I<$text> is longer than a screenful, uses the environment
+variable PAGER ( or I<less> ) to display it.
+If it is one or two lines it just omits the title and displays it.
+Otherwise it uses a simple built-in routine which expects either 'q'
+or I<Return> from the user; if the user presses I<Return>
+the displayed text remains on the screen and the dialogue continues
+after it, if the user presses 'q' the text is erased.
 
 =back
 
