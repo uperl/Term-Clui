@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.20';
+$VERSION = '1.21';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
@@ -66,7 +66,7 @@ sub select_file {   my %option = @_;
 		# split @allfiles into @files and @dirs for option processing ...
 		@dirs  = grep(-d "$dir/$_" && -r "$dir/$_", @allfiles);
 		if ($option{'-FPat'}) {
-			my @files = grep(!-d $_, glob("$dir/$option{'-FPat'}"));
+			@files = grep(!-d $_, glob("$dir/$option{'-FPat'}"));
 			my $length = $[ + 1 + length $dir;
 			foreach (@files) { $_ = substr $_, $length; }
 		} else {
@@ -155,7 +155,7 @@ Term::Clui::FileSelect.pm - Perl module to ask the user to select a file.
 
   use Term::Clui;
   use Term::Clui::FileSelect;
-  $file = &select_file(-Readable=>1, -TopDir=>'/home/www', -FPat='*.html');
+  $file = &select_file(-Readable=>1, -TopDir=>'/home/www', -FPat=>'*.html');
 
 =head1 DESCRIPTION
 
@@ -168,7 +168,7 @@ and of Tk::SimpleFileSelect,
 but various new options are introduced, namely I<-TopDir>,
 I<-TextFile>, I<-Readable>, I<-Writeable>, I<-Executable> and I<-Owned>.
 
-This is Term::Clui::FileSelect.pm version 1.20,
+This is Term::Clui::FileSelect.pm version 1.21,
 #COMMENT#.
 
 =head1 SUBROUTINES
