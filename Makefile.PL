@@ -15,7 +15,7 @@ Use the arrow keys (or h,j,k,l) and <Return> to make your choices.
 
 EOT
 
-my $version = '1.11';
+my $version = '1.12';
 # my $bindir  = &bindir;
 my $libdir  = &libdir . '/Term';
 my $mandir  = &mandir;
@@ -210,8 +210,8 @@ sub check_kit {
 
 	my %file_sizes = (
 		'Makefile.PL', 6749,
-		'Clui.raw', 26293,
-		'test_script', 2280,
+		'Clui.raw', 29387,
+		'test_script', 5134,
 	);
 
 	my $problem_found = 0;

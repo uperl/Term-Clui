@@ -24,6 +24,53 @@ require './Clui.raw'; import Term::Clui;
    'Rose Madder', 'Ultramarine Blue',
    'Vandyke Brown', 'Viridian Green', 'Yellow Ochre',
 );
+@scientists = (
+	'Luis Alvarez', 'Alain Aspect', 'Michael Barnsley', 'Johann Bernouilli',
+	'Nicolas Bernouilli', 'Friedrich Wilhelm Bessel', 'John Bell',
+	'Antoine Becquerel', 'Hans Bethe', 'David Bohm', 'Niels Bohr',
+	'Ludwig Boltzmann', 'Hermann Bondi', 'George Boole', 'Max Born',
+	'Satyendra Bose', 'Robert Boyle', 'Léon Brillouin', 'Eugenio Calabi',
+	'Georg Cantor', 'James Chadwick', 'Gregory Chaitin',
+	'Subrahmanyan Chandrasekar', 'Geoffrey Chew', 'Alonzo Church',
+	'John Horton Conway', 'Francis Crick', 'Marie Curie', 'Charles Darwin',
+	'Humphrey Davy', 'Richard Dawkins', 'Louis de Broglie', 'Max Delbrück',
+	'René Descartes', 'Willem de Sitter', 'Bruce DeWitt', 'Paul Dirac',
+	'Freeman Dyson', 'Arthur Stanley Eddington', 'Albert Einstein',
+	'Leonhard Euler', 'Hugh Everett', 'Michael Faraday', 'Pierre Fatou',
+	'Mitchell Feigenbaum', 'Pierre de Fermat', 'Enrico Fermi', 'Richard Feynman',
+	'Joseph Fraunhofer', 'Galileo Galilei', 'Evariste Galois', 'George Gamov',
+	'Carl Friedrich Gauss', 'Murray Gell-Mann', 'Kurt Gödel', 'Alan Guth',
+	'Stephen Hawking', 'Felix Hausdorff', 'Werner Heisenberg', 'Charles Hermite',
+	'Peter Higgs', 'David Hilbert', 'Fred Hoyle', 'Edwin Hubble',
+	'Christian Huygens', 'David Hilbert', 'Edwin Hubble', 'Pascual Jordan',
+	'Gaston Julia', 'Marc Kac', 'Theodor Kaluza', 'Stuart Kauffman',
+	'William Lord Kelvin',
+	'Gustav Robert Kirchhoff', 'Oskar Klein', 'Helge von Kock', 'Willis Lamb',
+	'Lev Davidovich Landau', 'Paul Langevin', 'Pierre Simon de Laplace',
+	'Gottfried Wilhelm Leibnitz', 'Paul Lévy', 'Hendrik Lorentz',
+	'James Clark Maxwell', 'Marston Morse', 'Benoit Mandelbrot', 'Gregor Mendel',
+	'Dmitri Mendeleev', 'Robert Millikan', 'Hermann Minkowski',
+	'John von Neumann', 'Isaac Newton', 'Emmy Noether',
+	'Hans Christian Oersted', 'Lars Onsager', 'Robert Oppenheimer',
+	'Abraham Pais', 'Heinz Pagels', 'Vilfredo Pareto', 'Louis Pasteur',
+	'Wolfgang Pauli', 'Linus Pauling', 'Guiseppe Peano', 'Rudolf Peierls',
+	'Roger Penrose', 'Arno Penzias', 'Jean Perrin', 'Max Planck',
+	'Boris Podolsky', 'Henri Poincaré', 'Isidor Rabi', 'Srinivasa Ramanujan',
+	'Lord Rayleigh', 'Lewis Fry Richardson', 'B. Riemann', 'Nathan Rosen',
+	'Ernest Rutherford', 'Abdus Salam', 'Erwin Schrödinger',
+	'Karl Schwarzschild', 'Julian Schwinger', 'Claude Shannon',
+	'Waclaw Sierpinski', 'Leo Szilard', 'Kip Thorne', 'Alan Turning',
+	'Sin-itro Tomonaga', 'Stanislaw Ulam', 'James Watson', 'Karl Weierstrauss',
+	'Hermann Weyl', 'Steven Weinberg', 'John Wheeler', 'Charles Weiner',
+	'Norbert Wiener', 'Eugene Wigner', 'Robert Wilson', 'Edward Witten',
+	'Shing-Tung Yau', 'Chen-Ning Yang', 'Hideki Yukawa',
+	'George Kingsley Zipf',
+);
+
+# $task = &choose ("Which test ?",
+
+$scientist = &choose ("Your favourite scientist ?", @scientists);
+exit unless $scientist;
 
 $paint = &choose ("Your favourite paint ?", @paints); exit unless $paint;
 
@@ -35,6 +82,8 @@ a multiline question OK.  After you choose Yes or No all but the
 first line should disappear,  leaving the question and answer on
 the screen as a record of the dialogue.
 EOT
+
+&confirm ('Did the text vanish except for the 1st line ?') || exit;
 
 $dummy = &ask (<<EOT,);  exit unless $dummy;
 Enter a string :
