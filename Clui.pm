@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.18';
+$VERSION = '1.19';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -313,8 +313,8 @@ sub choose {  local ($question, @list) = @_;
 			}
 			for (; $inew < $#list; $inew++) {
 				$new_mid_col = $icol[$inew] + 0.5 * $l[$inew];
-				last if $new_mid_col > $mid_col;		 # we're past it
-				last if $icol[$inew+1] < $icol[$inew]; # we're at EOL
+				last if $new_mid_col >= $mid_col;		# we've reached it
+				last if $icol[$inew+1] <= $icol[$inew]; # we're at EOL
 				$left_of_target = $mid_col - $new_mid_col;
 			}
 			if (($new_mid_col - $mid_col) > $left_of_target) { $inew--; }
@@ -804,7 +804,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.18,
+This is Term::Clui.pm version 1.19,
 #COMMENT#.
 
 =head1 WINDOW-SIZE

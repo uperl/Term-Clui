@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.18';
+$VERSION = '1.19';
 # use Term::Clui;
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
@@ -37,20 +37,17 @@ sub select_file {   my %option = @_;
 	if (!defined $option{'-Chdir'})   {$option{'-Chdir'} = 1;}
 
 	if ($option{'-Path'} && -d $option{'-Path'}) {
-warn "option{'-Path'} = $option{'-Path'}\n";
 		$dir=$option{'-Path'};
 		if ($dir =~ m#[^/]$#) { $dir .= '/'; }
 	} else {
 		$dir = $home;
 	}
 	if ($option{'-TopDir'}) {
-warn "option{'-TopDir'} = $option{'-TopDir'}\n";
 		if (!-d $option{'-TopDir'}) { delete $option{'-TopDir'};
 		} elsif ($option{'-TopDir'} =~ m#[^/]$#) { $option{'-TopDir'} .= '/';
 		}
 		if (index $dir, $option{'-TopDir'}) { $dir = $option{'-TopDir'}; }
 	}
-warn "dir = $dir\n";
 
    my ($new, $file, @allfiles, @files, @dirs, @pre, @post, %seen, $isnew);
 	my @dotfiles;
@@ -171,7 +168,7 @@ and of Tk::SimpleFileSelect,
 but various new options are introduced, namely I<-TopDir>,
 I<-TextFile>, I<-Readable>, I<-Writeable>, I<-Executable> and I<-Owned>.
 
-This is Term::Clui::FileSelect.pm version 1.18,
+This is Term::Clui::FileSelect.pm version 1.19,
 #COMMENT#.
 
 =head1 SUBROUTINES

@@ -9,3 +9,5 @@
 20020912 1.17 &choose default dbm handles collisions
 20021008 add &inform; &timestamp export-ok'd
 20030701 1.18 FreeBSD bug corrected ($^O now gives freebsd)
+20030912 debug warn statements removed from FileSelect.pm
+20031103 1.19 bug fixed handling DOWN in &choose
