@@ -1,0 +1,57 @@
+#! /usr/bin/perl
+#########################################################################
+#        This Perl script is Copyright (c) 2002, Peter J Billam         #
+#               c/o P J B Computing, www.pjb.com.au                     #
+#                                                                       #
+#     This script is free software; you can redistribute it and/or      #
+#            modify it under the same terms as Perl itself.             #
+#########################################################################
+require './Clui.pm'; import Term::Clui;
+
+@colours = ('Red','Orange','Black','Grey','Blue');
+@paints  = (
+   'Alizarin Crimson', 'Burnt Sienna', 'Cadmium Yellow',
+   'Cobalt Blue', 'Flake White', 'Indian Red', 'Indian Yellow',
+   'Ivory Black', 'Lemon Yellow', 'Naples Yellow',
+   'Prussian Blue', 'Raw Sienna', 'Raw Umber', 'Red Ochre',
+   'Rose Madder', 'Ultramarine Blue',
+   'Vandyke Brown', 'Viridian Green', 'Yellow Ochre',
+);
+
+$paint = &choose ("Your favourite paint ?", @paints); exit unless $paint;
+
+&confirm (<<EOT) || exit;
+OK to proceed with the test ?
+
+This step checks the 'confirm' subroutine and whether it handles
+a multiline question OK.  After you choose Yes or No all but the
+first line should disappear,  leaving the question and answer on
+the screen as a record of the dialogue.
+EOT
+
+$dummy = &ask (<<EOT);  exit unless $dummy;
+Enter a string :
+The point of this test is to check out the behaviour of &ask
+with multi-line questions; subsequent lines after the initial
+question should be formatted within the window width ...
+EOT
+
+$colour = &choose (<<EOT, @colours); exit unless $colour;
+Your favourite colour ?
+
+This tests the 'choose' subroutine and how it handles multi-line
+questions ...
+EOT
+
+$name = &ask ("Choose a name which rhymes with $colour :");
+exit unless $name;
+
+$text = &edit ('Your limerick', <<EOT);
+ There was a brave soul called $name,
+ Whose favourite colour was $colour;
+   But some $paint
+   ...
+ And that was the end of $name.
+EOT
+
+&view('Your limerick:', $text);
