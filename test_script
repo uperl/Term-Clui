@@ -6,9 +6,16 @@
 #     This script is free software; you can redistribute it and/or      #
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
-require './Clui.pm'; import Term::Clui;
+require './Clui.raw'; import Term::Clui;
 
 @colours = ('Red','Orange','Black','Grey','Blue');
+%names = (
+	Red => 'Fred',
+	Orange => 'Solange',
+	Black => 'Jack',
+	Grey => 'May',
+	Blue => 'Sue',
+);
 @paints  = (
    'Alizarin Crimson', 'Burnt Sienna', 'Cadmium Yellow',
    'Cobalt Blue', 'Flake White', 'Indian Red', 'Indian Yellow',
@@ -29,11 +36,15 @@ first line should disappear,  leaving the question and answer on
 the screen as a record of the dialogue.
 EOT
 
-$dummy = &ask (<<EOT);  exit unless $dummy;
+$dummy = &ask (<<EOT,);  exit unless $dummy;
 Enter a string :
+
 The point of this test is to check out the behaviour of &ask
 with multi-line questions; subsequent lines after the initial
 question should be formatted within the window width ...
+
+You should check ctrl-B (to beginning), ctrl-E (to end),
+backspace, left and right arrows, and ctrl-C (clear) ...
 EOT
 
 $colour = &choose (<<EOT, @colours); exit unless $colour;
@@ -43,7 +54,7 @@ This tests the 'choose' subroutine and how it handles multi-line
 questions ...
 EOT
 
-$name = &ask ("Choose a name which rhymes with $colour :");
+$name = &ask ("Choose a name which rhymes with $colour :", $names{$colour});
 exit unless $name;
 
 $text = &edit ('Your limerick', <<EOT);

@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-require './Clui'; import Term::Clui;
+require './Clui.raw'; import Term::Clui;
 
 &check_kit;
 
@@ -15,7 +15,7 @@ Use the arrow keys (or h,j,k,l) and <Return> to make your choices.
 
 EOT
 
-my $version = '1.10';
+my $version = '1.11';
 # my $bindir  = &bindir;
 my $libdir  = &libdir . '/Term';
 my $mandir  = &mandir;
@@ -46,8 +46,8 @@ EOT
 
 print F <<'EOT';
 
-Clui.pm : localise Clui
-	./localise Clui > $@
+Clui.pm : localise Clui.raw
+	./localise Clui.raw > $@
 
 ${LIBDIR}/Clui.pm : Clui.pm
 	perl -c Clui.pm
@@ -209,9 +209,9 @@ sub check_kit {
 	print STDERR "Checking your kit ... ";
 
 	my %file_sizes = (
-		'Makefile.PL', 6733,
-		'Clui', 25487,
-		'test_script', 2043,
+		'Makefile.PL', 6749,
+		'Clui.raw', 26293,
+		'test_script', 2280,
 	);
 
 	my $problem_found = 0;

@@ -13,13 +13,22 @@ For the user, &edit and &view use the default EDITOR and PAGER from the
 user's environment, except that if &view is called with a very short
 text a builtin viewer is used allowing the user to choose whether the
 text remains on-screen or is cleared.  &choose uses arrow keys (or hjkl)
-and return (or q to quit), &confirm expects Y,y,N or n.
+and return (or q to quit); &confirm expects Y,y,N or n; and &ask respects
+left and right arrows and backspace, and allows ctrl-C, ctrl-D or ctrl-X
+to clear the string.
 
-It's fast, very easy for both programmer and user, and has few external
-dependencies. It doesn't use curses which is a whole-of screen interface;
-it uses a tiny subset of vt100 sequences (up down left right normal and
-reverse), which are very portable.  There is an HTML equivalent planned,
-offering similarly named routines for CGI scripts.
+&choose maintains a DBM database of what the user chose last time in
+response to the same question, and if that choice is in the list this
+time then &choose highlights it as the default. Thus &choose manages
+its own defaults, and that applications using Term::Clui autoconfigure
+themselves to the user.  As of version 1.11, the programmer can pass
+&ask a default string as an optional second argument.
+
+Term::Clui is fast, very easy for both programmer and user, and has few
+external dependencies. It doesn't use curses which is a whole-of screen
+interface; it uses a tiny subset of vt100 sequences (up down left right
+normal and reverse), which are very portable.  There is an HTML equivalent
+planned, offering similarly named routines for CGI scripts.
 
 It requires Exporter, flush.pl, and complete.pl, which are all core Perl.
 It handles window size changes, using Term::Size.pm if that is available;

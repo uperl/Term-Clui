@@ -150,14 +150,20 @@ $SIG{'WINCH'} = sub { $size_changed = 1; };
 
 # ------------------------ ask stuff -------------------------
 
-sub ask_password { local ($question) = @_;  # no echo - use for passwords
-	local ($silent) = 'yes';	&ask ($question);
+sub ask_password { # no echo - use for passwords
+	local ($silent) = 'yes'; &ask ($_[$[]);
 }
-sub ask { local ($question) = $_[$[];	# returns a one-line text-entry answer
+sub ask { local ($question, $default) = @_;
 	return '' unless $question;
 	&initscr(); my $nol = &display_question($question);
 
    my $i = 0; my $n = 0; my @s = (); # cursor position, length, string
+	if ($default) {
+		$default =~ s/\t/	/g;
+		@s = split ('', $default); $n = scalar @s; $i = $[;
+		foreach $j ($[ .. $n) { &puts($s[$j]); }
+		&left($n);
+	}
 
 	for (;;) {
 		$c = &getch();
@@ -165,23 +171,27 @@ sub ask { local ($question) = $_[$[];	# returns a one-line text-entry answer
 		if ($size_changed) {
 			&erase_next_lines($nol); &up(1); $nol = &display_question($question);
 		}
-		if ($c == $KEY_LEFT && $i > 0) { $i--; &addch ("\010");
+		if ($c == $KEY_LEFT && $i > 0) { $i--; &left(1);
 		} elsif ($c == $KEY_RIGHT) {
 			if ($i < $n) { &addch ($silent ? "x" : $s[$i]); $i++; }
 		} elsif (($c eq "\cH") || ($c eq "\c?")) {
 			if ($i > 0) {
-			 	$n--; $i--;
-			 	splice(@s, $i, 1);
-			  	&addch ("\e[D");
-			  	foreach $j ($i .. $n) { print "$s[$j]"; }
-			  	&clrtoeol(); print "\cH" x ($n - $i);
+			 	$n--; $i--; splice(@s, $i, 1); &left(1);
+			  	foreach $j ($i .. $n) { &puts($s[$j]); }
+			  	&clrtoeol(); &left($n-$i);
 			}
+		} elsif ($c eq "\cC" || $c eq "\cX" || $c eq "\cD") {  # clear ...
+			&left($i); $i = 0; $n = 0; @s = (); &clrtoeol();
+		} elsif ($c eq "\cB") { &left($i); $i = 0;
+		} elsif ($c eq "\cE") { &right($n-$i); $i = $n;
 		} elsif ($c eq "\cL") {  # redraw ...
-		} elsif ($c !~ /[\000-\031]/) {
+		} elsif ($c > 255) { &beep();
+		} elsif ($c =~ /^[\032-\376]$/) {
 			splice(@s, $i, 0, $c);
 			$n++; $i++; &addch($silent ? "x" : $c);
-			foreach $j ($i .. $n) { print "$s[$j]"; }
+			foreach $j ($i .. $n) { &puts($s[$j]); }
 			&clrtoeol();  &left($n-$i);
+		} else { &beep();
 		}
 	}
 	&endwin(); $silent = ''; return join("", @s);
@@ -191,7 +201,7 @@ sub ask { local ($question) = $_[$[];	# returns a one-line text-entry answer
 
 sub choose {  local ($question, @list) = @_;
 	# If called in array context, should probably allow multiple choice,
-   # but this would be incompatible with the Tk widgets that would be
+   # though this would be incompatible with the Tk widgets that would be
    # implementing &choose in a GUI environment ...
 
 	return unless @list;
@@ -587,6 +597,9 @@ Term::Clui.pm - Perl module offering a Command-Line User Interface
 	use Term::Clui;
 	$chosen = &choose('A Title', @a_list);
 	if (&confirm ($text)) { &do_something; };
+	$answer = &ask($question);
+	$answer = &ask($question,$suggestion);
+	$password = &ask_password('Enter password : ');
 	$newtext = &edit($title, $text);
 	&edit($filename);
 	&view ($title, $text)  # if $title is not a filename
@@ -645,10 +658,16 @@ they will be displayed as a choice.
 
 =over 3
 
-=item I<ask>( $question );
+=item I<ask>( $question );  OR I<ask>( $question, $default );
 
 Asks the user the question and returns a string answer,
 with no newline character at the end.
+If the optional second argument is present, it is offered to the user
+as a default.
+For the user, left and right arrow keys move backward and forward
+through the string, delete and backspace erase the previous character,
+ctrl-B moves to the beginning, ctrl-E to the end,
+and ctrl-C, ctrl-D or ctrl-X clear the current string.
 
 =item I<ask_password>( $question );
 
