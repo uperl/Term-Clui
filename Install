@@ -5,7 +5,7 @@ use Config;
 &check_kit;
 
 my $libdir; my $man1dir; my $man3dir; my $comment; my $perlbin;
-my $version = '1.28';
+my $version = '1.29';
 ($libdir, $man1dir, $man3dir) = &defaults();
 
 if (! -t STDIN) {  # not interactive, use defaults ...
@@ -220,7 +220,7 @@ sub check_kit {
 		'README', 3026,
 		'Changes', 1685,
 		'MANIFEST', 121,
-		'Clui.pm', 36066,
+		'Clui.pm', 36576,
 		'Clui/FileSelect.pm', 8844,
 		'examples/test_script', 7185,
 		'examples/login_shell', 4703,

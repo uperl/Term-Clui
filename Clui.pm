@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.28';
+$VERSION = '1.29';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -291,14 +291,26 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 	} else {
 		&puts("$firstline\r\n");
 	}
-	if ($nrows >= $maxrows) { @list = &narrow_the_search(@list); }
+	if ($nrows >= $maxrows) {
+		@list = &narrow_the_search(@list);
+		if (! @list) {
+			&up(1); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
+			return wantarray ? () : undef;
+		}
+	}
 	&wr_screen();
 
 	while (1) {
 		$c = &getch();
 		if ($size_changed) {
 			&size_and_layout($nrows);
-			if ($nrows >= $maxrows) { @list = &narrow_the_search(@list); }
+			if ($nrows >= $maxrows) {
+				@list = &narrow_the_search(@list);
+				if (! @list) {
+					&up(1); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
+					return wantarray ? () : undef;
+				}
+			}
 			&wr_screen();
 		}
 		if ($c eq "q" || $c eq "\cD") {
@@ -363,7 +375,13 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 		} elsif ($c eq "\cL") {
 			if ($size_changed) {
 				&size_and_layout($nrows);
-				if ($nrows >= $maxrows) { @list = &narrow_the_search(@list); }
+				if ($nrows >= $maxrows) {
+					@list = &narrow_the_search(@list);
+					if (! @list) {
+						&up(1); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
+						return wantarray ? () : undef;
+					}
+				}
 			}
 			&wr_screen();
 		} elsif ($c eq "\r") {
@@ -477,7 +495,9 @@ sub narrow_the_search { my @biglist = @_;
 			 	$n--; $i--; splice(@s, $i, 1); &left(1);
 			  	foreach $j ($i..$n) { &puts($s[$j]); } &clrtoeol(); &left($n-$i);
 			}
+		# but these should do the "q for quit" job XXX
 		} elsif ($c eq "\cC" || $c eq "\cX" || $c eq "\cD") {  # clear ...
+			if (! @s) { $clue_has_been_given = 0; &erase_lines(1); return (); }
 			&left($i); $i = 0; $n = 0; @s = (); &clrtoeol();
 		} elsif ($c eq "\cB") { &left($i); $i = 0; next;
 		} elsif ($c eq "\cE") { &right($n-$i); $i = $n; next;
@@ -870,7 +890,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.28,
+This is Term::Clui.pm version 1.29,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
