@@ -5,7 +5,7 @@ use Config;
 &check_kit;
 
 my $libdir; my $man1dir; my $man3dir; my $comment; my $perlbin;
-my $version = '1.25';
+my $version = '1.26';
 ($libdir, $man1dir, $man3dir) = &defaults();
 
 if (! -t STDIN) {  # not interactive, use defaults ...
@@ -15,8 +15,8 @@ if (! -t STDIN) {  # not interactive, use defaults ...
 }
 
 if ($libdir) {
-	my $choice = &choose('Installing ...', 'interactively',
-	'using system default locations', 'Cancel');
+	my $choice = &choose('Installing',
+	'using system default locations', 'interactively', 'Cancel');
 	if ($choice eq 'Cancel') { exit 0; }
 	if ($choice eq 'using system default locations') {
 		if (! $libdir) { die "Sorry, can't write to $libdir\n"; }
@@ -218,7 +218,7 @@ sub check_kit {
 
 	my %file_sizes = (
 		'README', 3026,
-		'Changes', 1488,
+		'Changes', 1566,
 		'MANIFEST', 121,
 		'Clui.pm', 34367,
 		'Clui/FileSelect.pm', 8844,
