@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.23';
+$VERSION = '1.24';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -634,7 +634,7 @@ sub edit {	my ($title, $text) = @_;
 				my $msg = &ask ("$file is new. Please describe it:");
 				my $quotedmsg = $msg;  $quotedmsg =~ s/'/'"'"'/g;
 				if ($msg) {
-					system "rcs -i -U -t-'$quotedmsg' $file $rcsfile";
+					system "ci -q -l -t-'$quotedmsg' -i $file $rcsfile";
 					&logit ($basename, $msg);
 				}
 			} else {
@@ -862,7 +862,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.23,
+This is Term::Clui.pm version 1.24,
 #COMMENT#.
 
 =head1 WINDOW-SIZE

@@ -18,4 +18,5 @@
 20040709 &choose does multiple choice if called in array context
 20040711 get_default and set_default handle arrays with $; but not used yet
 20040714 1.22 remove timeout for returning ESC (it fails on Fedora xterm)
-20040720 1.23 @marked gets correctly reset at each invocation
+20040720 1.23 @marked gets correctly reset at each invocation of &choose
+20040801 1.24 &edit checks in initial RCS version correctly
