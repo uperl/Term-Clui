@@ -78,15 +78,24 @@ sub test_choose {
 	'Shing-Tung Yau', 'Chen-Ning Yang', 'Hideki Yukawa', 'George Kingsley Zipf',
 	);
 
-	$paint = &choose ("Your favourite paint ?", @paints);
-	$scientist = &choose ("Your favourite scientist ?", @scientists);
-	$colour = &choose (<<'EOT', @colours);
+	my $multi = &choose ('Mode ?', 'Single-choice', 'Multi-choice');
+	return unless $multi;
+	if ($multi eq 'Single-choice') {
+		my $paint = &choose ("Your favourite paint ?", @paints);
+		my $scientist = &choose ("Your favourite scientist ?", @scientists);
+		my $colour = &choose (<<'EOT', @colours);
 Your favourite colour ?
 
 This tests how the 'choose' subroutine handles multi-line
 questions ...
 EOT
-	warn "paint=$paint, scientist=$scientist, colour=$colour\n";
+		warn "paint=$paint, scientist=$scientist, colour=$colour\n";
+	} else {
+		my @fav_paints = &choose("Your favourite paints ?",@paints);
+		my @fav_scientists = &choose("Your favourite scientists ?",@scientists);
+		warn "paints = ".join(', ',@fav_paints) .
+			"\nscientists = ".join(', ',@fav_scientists)."\n";
+	}
 	return;
 }
 

@@ -15,3 +15,5 @@
 20040520 1.20 minor doc fix for FileSelect, contact.html not email address
 20040708 FileSelect -FPat bug fixed, and another minor doc fix
 20040708 1.21 examples/test_script defaults to installed Clui.pm
+20040709 &choose does multiple choice if called in array context
+20040711 get_default and set_default handle arrays with $; but not used yet

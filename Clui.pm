@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.21';
+$VERSION = '1.22';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -63,9 +63,9 @@ my ($rin, $nfound, $timeleft);  # for use by select
 sub getch {
 	my $c = getc(TTYIN);
 	if ($c eq "\033") {
-		($nfound, $timeleft) = select($rout=$rin, undef, undef, 0.05);
+		#($nfound, $timeleft)= select($rout=$rin, undef, undef, 0.05);
 		# warn "nfound=$nfound\n";  # always 0 on FreeBSD's cons25l1 :-(
-		if (! $nfound) { return "\033"; }
+		#if (! $nfound) {return "\033"; }
 		$c = getc(TTYIN);
 		if ($c eq "A") { return($KEY_UP); }
 		if ($c eq "B") { return($KEY_DOWN); }
@@ -251,26 +251,41 @@ sub debug {
 }
 
 my (%irow, %icol, $nrows, $clue_has_been_given, $choice, $this_cell);
+my @marked;
 my $HOME = $ENV{'HOME'} || $ENV{'LOGDIR'} || (getpwuid($<))[7];
 srand(time() ^ ($$+($$<15)));
 
 sub choose {  local ($question, @list) = @_;  # @list must be local
-	# If called in array context, should probably allow multiple choice,
-   # though this would be incompatible with the Tk widgets that would be
-   # implementing &choose in a GUI environment ...
+	# As from 1.22, allows multiple choice if called in array context
 
 	return unless @list;
 	grep (($_ =~ s/\n$//) && 0, @list);	# chop final \n if any
-	my @biglist = @list; my $icell;
+	my @biglist = @list; my $icell; @marked = ();
 
 	$question =~ s/^[\n\r]+//;   # strip initial newline(s)
 	$question =~ s/[\n\r]+$//;   # strip final newline(s)
 	my ($firstline,$otherlines) = split ("\n", $question, 2);
+	my $firstlinelength = length $firstline;
 
 	$choice = &get_default($firstline);
+	# If wantarray ? Is remembering multiple choices safe ?
 
-	&initscr(); &puts("$firstline\r\n");
+	&initscr();
 	&size_and_layout(0);
+	if (wantarray) {
+		$#marked = $#list;
+		if ($firstlinelength < $maxcols-30) {
+			&puts("$firstline (multiple choice with spacebar)\r\n");
+		} elsif ($firstlinelength < $maxcols-16) {
+			&puts("$firstline (multiple choice)\r\n");
+		} elsif ($firstlinelength < $maxcols-9) {
+			&puts("$firstline (multiple)\r\n");
+		} else {
+			&puts("$firstline\r\n");
+		}
+	} else {
+		&puts("$firstline\r\n");
+	}
 	if ($nrows >= $maxrows) { @list = &narrow_the_search(@list); }
 	&wr_screen();
 
@@ -296,7 +311,7 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 			}
 			&goto (0,0); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
 			return wantarray ? () : undef;
-		} elsif ((($c eq " ") || ($c eq "\t")) && ($this_cell < $#list)) {
+		} elsif (($c eq "\t") && ($this_cell < $#list)) {
 			$this_cell++; &wr_cell($this_cell-1);
 			&wr_cell($this_cell); 
 		} elsif ((($c eq "l") || ($c eq $KEY_RIGHT)) && ($this_cell < $#list)
@@ -347,12 +362,48 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 			}
 			&wr_screen();
 		} elsif ($c eq "\r") {
-			&erase_lines(1);
-			&goto((length $firstline)+1,0); &puts($list[$this_cell]."\n\r");
+			&erase_lines(1); &goto($firstlinelength+1, 0);
+			my @chosen;
+			if (wantarray) {
+				my $i; for ($i=$[; $i<=$#list; $i++) {
+					if ($marked[$i] || $i==$this_cell) { push @chosen, $list[$i]; }
+				}
+				&clrtoeol();
+				my $remaining = $maxcols-$firstlinelength;
+				my $last = pop @chosen;
+				my $dotsprinted;
+				foreach (@chosen) {
+					if (($remaining - length $_) < 4) {
+						$dotsprinted=1; &puts("..."); $remaining -= 3; last;
+					} else {
+						&puts("$_, "); $remaining -= (2 + length $_);
+					}
+				}
+				if (!$dotsprinted) {
+					if (($remaining - length $last)>0) { &puts($last);
+					} elsif ($remaining > 2) { &puts('...');
+					}
+				}
+				&puts("\n\r");
+				push @chosen, $last;
+			} else {
+				&puts($list[$this_cell]."\n\r");
+			}
 			&endwin();
-			&set_default($firstline, $list[$this_cell]);
+			&set_default($firstline, $list[$this_cell]); # join ($,,@chosen) ?
 			$clue_has_been_given = 0;
-			return wantarray ? ($list[$this_cell]) : $list[$this_cell];
+			if (wantarray) { return @chosen;
+			} else { return $list[$this_cell];
+			}
+		} elsif ($c eq " ") {
+			if (wantarray) {
+				$marked[$this_cell] = !$marked[$this_cell];
+				if ($this_cell < $#list) {
+					$this_cell++; &wr_cell($this_cell-1); &wr_cell($this_cell); 
+				}
+			} elsif ($this_cell < $#list) {
+				$this_cell++; &wr_cell($this_cell-1); &wr_cell($this_cell); 
+			}
 		}
 	}
 	warn "choose: shouldn't reach here ...\n";
@@ -465,7 +516,7 @@ sub ask_for_clue { my ($nchoices, $i, $s) = @_;
 sub get_default { my ($question) = @_;
 	if ($ENV{CLUI_DIR} eq 'OFF') { return undef; }
 	if (! $question) { return undef; }
-	my $choice;
+	my @choices;
 	my $n_tries = 5;
 	while ($n_tries--) {
 		if (dbmopen (%CHOICES, &dbm_file(), 0600)) {
@@ -477,10 +528,12 @@ sub get_default { my ($question) = @_;
 			}
 		}
 	}
-	$choice = $CHOICES{$question}; dbmclose %CHOICES;
-	return $choice;
+	@choices = split ($; ,$CHOICES{$question}); dbmclose %CHOICES;
+	if (wantarray) { return @choices;
+	} else { return $choices[$[];
+	}
 }
-sub set_default { my ($question, $choice) = @_;
+sub set_default { my $question = shift; my $s = join ($; , @_);
 	if ($ENV{CLUI_DIR} eq 'OFF') { return undef; }
 	if (! $question) { return undef; }
 	my $n_tries = 5;
@@ -494,8 +547,8 @@ sub set_default { my ($question, $choice) = @_;
 			}
 		}
 	}
-	$CHOICES{$question} = $choice; dbmclose %CHOICES;
-	return $choice;
+	$CHOICES{$question} = $s; dbmclose %CHOICES;
+	return $s;
 }
 sub dbm_file {
 	if ($ENV{CLUI_DIR} eq 'OFF') { return undef; }
@@ -770,7 +823,8 @@ Term::Clui.pm - Perl module offering a Command-Line User Interface
 =head1 SYNOPSIS
 
 	use Term::Clui;
-	$chosen = &choose('A Title', @a_list);
+	$chosen = &choose('A Title', @a_list);  # single choice
+	@chosen = &choose('A Title', @a_list);  # multiple choice
 	if (&confirm($text)) { &do_something(); };
 	$answer = &ask($question);
 	$answer = &ask($question,$suggestion);
@@ -795,8 +849,9 @@ This user interface can therefore be intermixed with
 standard applications which write to STDOUT or STDERR,
 such as I<make>, I<pgp>, I<rcs> etc.
 
-For the user, I<&choose> uses arrow keys (or hjkl) and return or q,
-and I<&confirm> expects y, Y, n or N.
+For the user, I<&choose> uses arrow keys (or hjkl) and Return or q;
+also SpaceBar for multiple choices.
+I<&confirm> expects y, Y, n or N.
 In general, ctrl-L redraws the (currently active bit of the) screen.
 I<&edit> and I<&view> use the default EDITOR and PAGER if possible.  
 
@@ -807,7 +862,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.21,
+This is Term::Clui.pm version 1.22,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
@@ -853,10 +908,18 @@ Does the same with no echo, as used for password entry.
 =item I<choose>( $question, @list );
 
 Displays the question, and formats the list items onto the lines beneath it.
-The user can choose an item using arrow keys (or hjkl) and return,
+
+If I<choose> is called in a scalar context,
+the user can choose an item using arrow keys (or hjkl) and Return,
 or cancel the choice with a 'q'.
 I<choose> then returns the chosen item,
 or I<undefined> if the choice was cancelled.
+
+If I<choose> is called in an array context,
+the user can also mark an item with the SpaceBar.
+I<choose> then returns the list of marked items,
+(including the item highlit when Return was pressed),
+or an empty array if the choice was cancelled.
 
 A DBM database is maintained of the question and its chosen response.
 The next time the user is offered a choice with the same question,
@@ -865,6 +928,9 @@ as the default; otherwise the first item is highlighted.
 Different parts of the code, or different applications using I<Term::Clui.pm>
 can therefore exchange defaults simply by using the same question words,
 such as "Which printer ?".
+Multiple choices are not remembered, as the danger exists
+that the user might fail to notice some of the highlit items
+(for example, all the items might not fit onto one screen).
 
 The database I<~/.clui_dir/choices> or I<$ENV{CLUI_DIR}/choices>
 is available to be read or written if lower-level manipulation is needed,
