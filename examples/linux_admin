@@ -1,0 +1,238 @@
+#! /usr/bin/perl
+#
+#########################################################################
+#        This Perl script is Copyright (c) 2003, Peter J Billam         #
+#               c/o P J B Computing, www.pjb.com.au                     #
+#                                                                       #
+#     This script is free software; you can redistribute it and/or      #
+#            modify it under the same terms as Perl itself.             #
+#########################################################################
+
+use Term::Clui;
+use Term::Clui::FileSelect;
+$debug = 0;
+$hostname = `hostname`; $hostname =~ s/[\r\n]*//;
+@PATH = split (":", $ENV{PATH});
+my $daemon_d;
+my @system_configs;
+my $crond = '/var/spool/cron';
+@tasks = &tasks();
+if (! @tasks) { die "Sorry, no administration tasks are available\n"; }
+while () {
+   $task = &choose ("Administration $hostname", @tasks);
+   if (! $task) { exit;
+   } elsif ($task eq "Become superuser") { exec "su - -c $0";
+   } elsif ($task eq "chpass")    { system "chpass";
+   } elsif ($task eq "vipw")      { system "vipw";
+   } elsif ($task eq "visudo")    { system "visudo";
+   } elsif ($task eq "adduser")   { &adduser();
+   } elsif ($task eq "chkconfig") { &chkconfig();
+   } elsif ($task eq "crontab")   { &crontab();
+   } elsif ($task eq "Network ports") { &ports();
+   } elsif ($task eq "system-config") { &system_config();
+   } elsif ($task eq "Daemons")   { &daemons();
+   } elsif ($task eq "Squid")     { &squid();
+   } elsif ($task eq "Samba")     { &samba();
+   } elsif (-f $task) { &edit ($task);
+   } elsif (-d $task) {
+		$file = &select_file(-TextFile=>1, -TopDir=>$task);
+		if ($file) { &edit ($file) };
+   }
+}
+sub tasks {
+	my @tasks;
+	if (! $>) {   # root stuff
+   	foreach $f (
+			qw(chkconfig adduser chpass sax sax2 vipw visudo yast yast2)) {
+			if (&which($f)) { push @tasks, $f; }
+		}
+		if (opendir D, '/usr/bin') {
+			@system_configs = grep /^system-config-/, readdir D; closedir D;
+			if (@system_configs) { push @tasks, 'system-config'; }
+			foreach (@system_configs) { s/^system-config-//; }
+		}
+	} else { push @tasks, 'Become superuser';
+	}
+	if (-d $crond) { push @tasks, 'crontab'; }
+	foreach (
+		'/etc/inittab',
+		'/etc/sysconfig',
+		'/etc/xinetd.d',
+		'/etc/resolv.conf',
+		'/etc/group',
+		'/etc',
+	) { if (-d $_ || -f $_) { push @tasks, $_; } }
+	if (-d '/usr/local/squid') { push @tasks, 'Squid'; }
+	if (-d '/usr/local/samba') { push @tasks, 'Samba'; }
+	if (! $>) {
+		foreach ('/etc/rc.d/init.d','/etc/init.d') {
+			if (-d $_) {$daemon_d = $_; push @tasks, 'Daemons'; last}
+		}
+	};
+	push @tasks, 'Network ports';
+	return @tasks;
+}
+sub squid {
+	my @tasks = ( 'tail -f access.log', 'tail -f access.log | grep',
+	'tail -f cache.log');
+	if (!$>) { push @tasks, 'Reconfigure'; }
+	my $task = &choose('Squid ?', @tasks);
+	return unless $task;
+	if ($task =~ /(\w+\.log)$/) { system "tail -f /usr/local/squid/logs/$1";
+	} elsif ($task =~ /grep$/) {
+		my $s = &ask ('look for what regexp ?');
+		next unless $s;
+		system "tail -f /usr/local/squid/logs/access.log | grep '$s'";
+	} elsif ($task eq 'Reconfigure') {
+		if (! chdir '/usr/local/squid/etc/') {
+			&sorry("can't chdir '/usr/local/squid/etc': $!"); return;
+		}
+		&edit ('squid.conf');
+		if (&confirm ('OK to "squid -k reconfigure" ?')) {
+			system '/usr/local/squid/sbin/squid -k reconfigure';
+		}
+	} 
+}
+sub samba {
+	my $dir = '/usr/local/samba';
+	my @tasks = ('cache.log','access.log');
+	if (!$>) { push @tasks, 'smb.conf'; }
+	if (-w "$dir/lib/username.map") { push @tasks, 'username.map'; }
+	my $task = &choose('Samba ?', @tasks);
+	return unless $task;
+	if ($task =~ /(\w+\.log)$/) { system "tail -f /usr/local/samba/logs/$1";
+	} elsif ($task =~ /grep$/) {
+		my $s = &ask ('look for what regexp ?');
+		next unless $s;
+		system "tail -f $dir/logs/access.log | grep '$s'";
+	} elsif ($task eq 'smb.conf' || $task eq 'username.map') {
+		if (! chdir "$dir/lib") { &sorry("can't chdir '$dir/lib': $!"); return; }
+		while (1) {
+			&edit ($task);
+			my $retval = system "$dir/bin/testparm";
+			if ($? == -1) {
+			 	&sorry("can't run testparm: $!\n"); return;
+			} elsif ($? & 127) {
+				&sorry (sprintf "testparm died with signal %d, %s coredump\n",
+				($? & 127),  ($? & 128)?'with':'without'); return;
+			} else {
+				# $retval >> 8;
+				if (! $retval) {
+					if (&confirm ('OK to Reload Config" ?')) {
+						system "$dir/bin/smbcontrol smbd reload-config";
+						system "$dir/bin/smbcontrol nmbd reload-config";
+					}
+					last;
+				} else {
+					warn "That didn't work, you'll need to re-edit smb.conf ...";
+				}
+			}
+		}
+	} 
+}
+sub ports {
+	if (! open (P, "netstat -a |")) {
+		&sorry("can't run netstat -a: $!"); return 0;
+	}
+	my @lines; while (<P>) { if (/LISTEN|ESTABLISH/) { push @lines, $_; } }
+	close P;
+	&view ("Ports", join('', @lines));
+}
+sub daemons {
+	my $task = &choose('Task ?','start','restart','stop');
+	return unless $task;
+	my $daemon = &select_file
+		(-Title=>'which daemon ?', -TextFile=>1, -TopDir=>$daemon_d, -Chdir=>0);
+	return unless $daemon;
+	system "sh $daemon $task";
+}
+sub crontab {
+	if ($>) { system "crontab -e"; return 0; }
+	if (! opendir(D,$crond)) { warn "can't opendir $crond: \n"; return 0; }
+	my @users = grep { !/^\./ } readdir(D);
+	closedir D;
+	if (! @users) { warn "no crontabs found in $crond\n"; return 0; }
+	my $task = &choose('crontab task ?', 'View', 'Edit', 'Manual');
+	return unless $task;
+	if ($task eq 'Manual') { system 'man 5 crontab'; return; }
+	my $user = &choose ("$task which user ?", @users);
+	return unless $user;
+	if ($task eq 'Edit') { system "crontab -e -u $user";
+	} else { system "crontab -l -u $user";
+	}
+}
+sub chkconfig {
+	if (! open (P, "chkconfig --list |")) {
+		&sorry("can't run chkconfig --list: $!"); return 0;
+	}
+	my @l; my @xinetdl; while (<P>) {
+		chop;
+		if (/^\s/ || /based services/) { push @xinetdl, $_;
+		} else { push @l, $_;
+		}
+	}
+	my $task = &choose('chkconfig task ?', 'View', 'Edit');
+	return unless $task;
+	if ($task eq 'Edit') {
+		my %services;
+		foreach (@l) { /^(\S+)\s+(.*)$/; $services{$1}=$2; }
+		my $service = &choose('Edit which service ?', sort keys %services);
+		return unless $service;
+		&inform ($services{$service});
+		my @runlevels = &choose('at which runlevels ?','1','2','3','4','5');
+		return unless @runlevels;
+		my $onoff =
+		&choose("$service at runlevels ".join(",",@runlevels),'on','off');
+		return unless $onoff;
+		system "chkconfig --level ".join('',@runlevels)." $service $onoff";
+	} else {
+		&view('chkconfig --list', join("\n", (sort @l ),@xinetdl));
+	}
+	&view ('Daemon configuration', $s);
+}
+sub system_config {
+	my $task = &choose('which system-config ?', @system_configs);
+   return unless $task;
+	system "/usr/bin/system-config-$task";
+}
+sub adduser {
+	my $name =     &ask('new username  ?');
+	if (getpwnam($name)) { &sorry("user $name already exists"); return 0; }
+	my @groups = &choose('groups        ?', &groups());
+	my $group; my @secondary_groups=();
+	if (1 < scalar @groups) {
+		$group = &choose('primary group ?', @groups);
+		foreach (@groups) { if ($_ ne $group) { push @secondary_groups, $_; } }
+	} else {
+		$group = $groups[$[];
+	}
+	return unless $group;
+	my $fullname = &ask('full name     ?');
+	my $shell = &choose('login shell   ?', &shells());
+	my $cmd = &which("adduser") . " -g $group";
+	if (@secondary_groups) { $cmd .= " -G " . join(",",@secondary_groups) ; }
+	if ($fullname) { $cmd .= " -c '$fullname'"; }
+	if ($shell) { $cmd .= " -s $shell"; }
+	$cmd .= " $name";
+	&confirm("OK to $cmd ?") && system $cmd;
+}
+# ------------------------- infrastructure ----------------------
+sub groups {
+	my @groups=(); my $n;
+	setgrent; while ($n = getgrent()) { push @groups, $n; } endgrent;
+	sort @groups;
+}
+sub shells {
+	my @shells; my $d; my $x;
+	foreach $d ('/bin','/usr/bin') {
+		if (! opendir(D,$d)) { &sorry("can't opendir $d: $!\n"); return ; }
+		while ($_ = readdir D) {
+			if (/sh$/ && !/ssh$/ && !/\.sh$/ && !/splash$/ && !/flash$/) {
+				push @shells, "$d/$_";
+			}
+		}
+		closedir D;
+	}
+	sort @shells;
+}
+sub which { my $f; foreach $d (@PATH) { $f="$d/$_[$[]";  return $f if -x $f; } }

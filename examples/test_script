@@ -6,6 +6,7 @@
 #     This script is free software; you can redistribute it and/or      #
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
+use warnings;
 eval "require './Term/Clui.pm'";
 if ($@) { eval "require '../Clui.pm'"; }
 if ($@) { eval "require 'Clui.pm'"; }
@@ -19,6 +20,9 @@ if ($@) {
 	die "can't find FileSelect.pm in this dir, parent dir, or INC path\n";
 }
 import Term::Clui::FileSelect;
+my $colour = "";
+my $paint = "";
+my $name = "";
 
 while (1) {
 	my $task = &choose ('Test which Clui.pm subroutine ?',
@@ -81,9 +85,9 @@ sub test_choose {
 	my $multi = &choose ('Mode ?', 'Single-choice', 'Multi-choice');
 	return unless $multi;
 	if ($multi eq 'Single-choice') {
-		my $paint = &choose ("Your favourite paint ?", @paints);
+		$paint = &choose ("Your favourite paint ?", @paints);
 		my $scientist = &choose ("Your favourite scientist ?", @scientists);
-		my $colour = &choose (<<'EOT', @colours);
+		$colour = &choose (<<'EOT', @colours);
 Your favourite colour ?
 
 This tests how the 'choose' subroutine handles multi-line
@@ -157,6 +161,7 @@ sub test_select_file {
 	while (1) {
 		foreach (@bool_opts) {
 			$opts{$_} = &choose("option $_ ?",'default','0','1');
+			return unless $opts{$_};
 			if ($opts{$_} eq 'default') { delete $opts{$_}; }
 		}
 		foreach (@text_opts) {

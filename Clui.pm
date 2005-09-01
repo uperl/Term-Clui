@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.30';
+$VERSION = '1.31';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -16,7 +16,8 @@ require Exporter;
 @EXPORT_OK = qw(beep tiview back_up get_default set_default timestamp);
 %EXPORT_TAGS = (ALL => [@EXPORT,@EXPORT_OK]);
 
-no strict; local $^W = 0;
+no strict; # local $^W = 0;
+no warnings;
 
 # ------------------------ vt100 stuff -------------------------
 
@@ -24,15 +25,15 @@ $A_NORMAL    =  0;
 $A_BOLD      =  1;
 $A_UNDERLINE =  2;
 $A_REVERSE   =  4;
-$KEY_UP    = oct(403);
-$KEY_LEFT  = oct(404);
-$KEY_RIGHT = oct(405);
-$KEY_DOWN  = oct(402);
+$KEY_UP    = 0403;
+$KEY_LEFT  = 0404;
+$KEY_RIGHT = 0405;
+$KEY_DOWN  = 0402;
 $KEY_ENTER = "\r";
 $KEY_ENTER .= '';  # circumvent stupid bloody -w warning
-$KEY_PPAGE = oct(523);
-$KEY_NPAGE = oct(522);
-$KEY_BTAB  = oct(541);
+$KEY_PPAGE = 0523;
+$KEY_NPAGE = 0522;
+$KEY_BTAB  = 0541;
 
 my $irow; my $icol;   # maintained by &puts, &up, &down, &left and &right
 sub puts   { my $s = join '', @_;
@@ -85,14 +86,14 @@ sub getch {
 			return($c);
 		}
 		return($c);
-	} elsif ($c == oct(0217)) {
+	} elsif ($c eq ord(0217)) {
 		$c = getc(TTYIN);
 		if ($c eq "A") { return($KEY_UP); }
 		if ($c eq "B") { return($KEY_DOWN); }
 		if ($c eq "C") { return($KEY_RIGHT); }
 		if ($c eq "D") { return($KEY_LEFT); }
 		return($c);
-	} elsif ($c == oct(0233)) {
+	} elsif ($c eq ord(0233)) {
 		$c = getc(TTYIN);
 		if ($c eq "A") { return($KEY_UP); }
 		if ($c eq "B") { return($KEY_DOWN); }
@@ -331,18 +332,18 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 		} elsif (($c eq "\t") && ($this_cell < $#list)) {
 			$this_cell++; &wr_cell($this_cell-1);
 			&wr_cell($this_cell); 
-		} elsif ((($c eq "l") || ($c eq $KEY_RIGHT)) && ($this_cell < $#list)
+		} elsif ((($c eq "l") || ($c == $KEY_RIGHT)) && ($this_cell < $#list)
 			&& ($irow[$this_cell] == $irow[$this_cell+1])) {
 			$this_cell++; &wr_cell($this_cell-1);
 			&wr_cell($this_cell); 
-		} elsif ((($c eq "\cH") || ($c eq $KEY_BTAB)) && ($this_cell > $[)) {
+		} elsif ((($c eq "\cH") || ($c == $KEY_BTAB)) && ($this_cell > $[)) {
 			$this_cell--; &wr_cell($this_cell+1);
 			&wr_cell($this_cell); 
-		} elsif ((($c eq "h") || ($c eq $KEY_LEFT)) && ($this_cell > $[)
+		} elsif ((($c eq "h") || ($c == $KEY_LEFT)) && ($this_cell > $[)
 			&& ($irow[$this_cell] == $irow[$this_cell-1])) {
 			$this_cell--; &wr_cell($this_cell+1);
 			&wr_cell($this_cell); 
-		} elsif ((($c eq "j") || ($c eq $KEY_DOWN)) && ($irow < $nrows)) {
+		} elsif ((($c eq "j") || ($c == $KEY_DOWN)) && ($irow < $nrows)) {
 			$mid_col = $icol[$this_cell] + 0.5 * $l[$this_cell];
 			$left_of_target = 1000;
 			for ($inew=$this_cell+1; $inew < $#list; $inew++) {
@@ -357,7 +358,7 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 			if (($new_mid_col - $mid_col) > $left_of_target) { $inew--; }
 			$iold = $this_cell; $this_cell = $inew;
 			&wr_cell($iold); &wr_cell($this_cell);
-		} elsif ((($c eq "k") || ($c eq $KEY_UP)) && ($irow > 1)) {
+		} elsif ((($c eq "k") || ($c == $KEY_UP)) && ($irow > 1)) {
 			$mid_col = $icol[$this_cell] + 0.5 * $l[$this_cell];
 			$right_of_target = 1000;
 			for ($inew=$this_cell-1; $inew > 0; $inew--) {
@@ -890,7 +891,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.30,
+This is Term::Clui.pm version 1.31,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
