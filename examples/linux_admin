@@ -1,5 +1,7 @@
 #! /usr/bin/perl
 #
+# usage: hash = Host Admin Shell
+#
 #########################################################################
 #        This Perl script is Copyright (c) 2003, Peter J Billam         #
 #               c/o P J B Computing, www.pjb.com.au                     #
@@ -15,24 +17,33 @@ $hostname = `hostname`; $hostname =~ s/[\r\n]*//;
 @PATH = split (":", $ENV{PATH});
 my $daemon_d;
 my @system_configs;
-my $crond = '/var/spool/cron';
+my $crond = &first_existing('/var/spool/cron/crontabs','/var/spool/cron');
+my $squidlogd  = &first_existing('/usr/local/squid/logs','/var/squid/logs');
+my $squidconfd = &first_existing('/usr/local/squid/etc','/etc/squid');
+my $squid = &first_existing('/usr/local/squid/sbin/squid','/usr/sbin/squid');
+my $sambalogd  = &first_existing('/usr/local/samba/var','/var/log/samba');
+my $sambaconfd = &first_existing('/usr/local/samba/lib','/etc/samba');
 @tasks = &tasks();
 if (! @tasks) { die "Sorry, no administration tasks are available\n"; }
 while () {
-   $task = &choose ("Administration $hostname", @tasks);
+   $task = &choose ("Administrating $hostname", @tasks);
    if (! $task) { exit;
    } elsif ($task eq "Become superuser") { exec "su - -c $0";
-   } elsif ($task eq "chpass")    { system "chpass";
-   } elsif ($task eq "vipw")      { system "vipw";
-   } elsif ($task eq "visudo")    { system "visudo";
-   } elsif ($task eq "adduser")   { &adduser();
-   } elsif ($task eq "chkconfig") { &chkconfig();
-   } elsif ($task eq "crontab")   { &crontab();
+   } elsif ($task eq "chpass")      { system "chpass";
+   } elsif ($task eq "vipw")        { system "vipw";
+   } elsif ($task eq "visudo")      { system "visudo";
+   } elsif ($task eq "base-config") { system "base-config";
+   } elsif ($task eq "aptitude")    { system "aptitude";
+   } elsif ($task eq "adduser")     { &adduser();
+   } elsif ($task eq "chkconfig")   { &chkconfig();
+   } elsif ($task eq "update-rc.d") { &update_rcd();
+   } elsif ($task eq "crontab")     { &crontab();
    } elsif ($task eq "Network ports") { &ports();
    } elsif ($task eq "system-config") { &system_config();
-   } elsif ($task eq "Daemons")   { &daemons();
-   } elsif ($task eq "Squid")     { &squid();
-   } elsif ($task eq "Samba")     { &samba();
+   } elsif ($task eq "Daemons")     { &daemons();
+   } elsif ($task eq "Squid")       { &squid();
+   } elsif ($task eq "Samba")       { &samba();
+   } elsif ($task eq "Apache")      { &apache();
    } elsif (-f $task) { &edit ($task);
    } elsif (-d $task) {
 		$file = &select_file(-TextFile=>1, -TopDir=>$task);
@@ -43,7 +54,8 @@ sub tasks {
 	my @tasks;
 	if (! $>) {   # root stuff
    	foreach $f (
-			qw(chkconfig adduser chpass sax sax2 vipw visudo yast yast2)) {
+			qw(chkconfig update-rc.d adduser chpass sax sax2
+			vipw visudo yast yast2 base-config aptitude)) {
 			if (&which($f)) { push @tasks, $f; }
 		}
 		if (opendir D, '/usr/bin') {
@@ -62,8 +74,11 @@ sub tasks {
 		'/etc/group',
 		'/etc',
 	) { if (-d $_ || -f $_) { push @tasks, $_; } }
-	if (-d '/usr/local/squid') { push @tasks, 'Squid'; }
-	if (-d '/usr/local/samba') { push @tasks, 'Samba'; }
+	if (-d $squidlogd)  { push @tasks, 'Squid'; }
+	if (-d $sambaconfd) { push @tasks, 'Samba'; }
+	if (-d '/usr/local/apache/conf' || -d '/etc/apache/conf.d') {
+		push @tasks, 'Apache';
+	}
 	if (! $>) {
 		foreach ('/etc/rc.d/init.d','/etc/init.d') {
 			if (-d $_) {$daemon_d = $_; push @tasks, 'Daemons'; last}
@@ -75,41 +90,45 @@ sub tasks {
 sub squid {
 	my @tasks = ( 'tail -f access.log', 'tail -f access.log | grep',
 	'tail -f cache.log');
-	if (!$>) { push @tasks, 'Reconfigure'; }
+	if ($squid && !$>) { push @tasks, 'Reconfigure'; }
 	my $task = &choose('Squid ?', @tasks);
 	return unless $task;
-	if ($task =~ /(\w+\.log)$/) { system "tail -f /usr/local/squid/logs/$1";
+	if ($task =~ /(\w+\.log)$/) { system "tail -f $squidlogd/$1";
 	} elsif ($task =~ /grep$/) {
 		my $s = &ask ('look for what regexp ?');
 		next unless $s;
-		system "tail -f /usr/local/squid/logs/access.log | grep '$s'";
+		system "tail -f $squidlogd/access.log | grep '$s'";
 	} elsif ($task eq 'Reconfigure') {
-		if (! chdir '/usr/local/squid/etc/') {
-			&sorry("can't chdir '/usr/local/squid/etc': $!"); return;
+		if (! chdir $squidconfd) {
+			&sorry("can't chdir $squidconfd: $!"); return;
 		}
 		&edit ('squid.conf');
 		if (&confirm ('OK to "squid -k reconfigure" ?')) {
-			system '/usr/local/squid/sbin/squid -k reconfigure';
+			system "$squid -k reconfigure";
 		}
 	} 
 }
 sub samba {
-	my $dir = '/usr/local/samba';
+	my $sambabind = "/usr/bin";
+	if (-d "/usr/local/samba/bin") { $sambabind = "/usr/local/samba/bin"; }
+
 	my @tasks = ('cache.log','access.log');
 	if (!$>) { push @tasks, 'smb.conf'; }
-	if (-w "$dir/lib/username.map") { push @tasks, 'username.map'; }
+	if (-w "$sambaconfd/username.map") { push @tasks, 'username.map'; }
 	my $task = &choose('Samba ?', @tasks);
 	return unless $task;
-	if ($task =~ /(\w+\.log)$/) { system "tail -f /usr/local/samba/logs/$1";
+	if ($task =~ /(\w+\.log)$/) { system "tail -f $sambalogd/$1";
 	} elsif ($task =~ /grep$/) {
 		my $s = &ask ('look for what regexp ?');
 		next unless $s;
-		system "tail -f $dir/logs/access.log | grep '$s'";
+		system "tail -f $sambalogd/access.log | grep '$s'";
 	} elsif ($task eq 'smb.conf' || $task eq 'username.map') {
-		if (! chdir "$dir/lib") { &sorry("can't chdir '$dir/lib': $!"); return; }
+		if (! chdir $sambaconfd) {
+			&sorry("can't chdir sambaconfd: $!"); return;
+		}
 		while (1) {
 			&edit ($task);
-			my $retval = system "$dir/bin/testparm";
+			my $retval = system "$sambabind/testparm";
 			if ($? == -1) {
 			 	&sorry("can't run testparm: $!\n"); return;
 			} elsif ($? & 127) {
@@ -118,23 +137,40 @@ sub samba {
 			} else {
 				# $retval >> 8;
 				if (! $retval) {
-					if (&confirm ('OK to Reload Config" ?')) {
-						system "$dir/bin/smbcontrol smbd reload-config";
-						system "$dir/bin/smbcontrol nmbd reload-config";
+					if (&confirm ('OK to Reload Config ?')) {
+						system "$sambabind/smbcontrol smbd reload-config";
+						system "$sambabind/smbcontrol nmbd reload-config";
 					}
 					last;
 				} else {
-					warn "That didn't work, you'll need to re-edit smb.conf ...";
+					warn "That didn't work, you'll need to re-edit smb.conf ...\n";
 				}
 			}
 		}
 	} 
 }
+sub apache {
+	my $d = '/etc/apache/conf.d';
+	my $file; my $apachectl;
+	if (-d $d) {
+		$file = &select_file
+			(-Title=>'which site ?', -TextFile=>1, -TopDir=>$d, -Chdir=>0);
+		$apachectl = '/usr/sbin/apachectl';
+	} else {
+		$file = '/usr/local/apache/conf/httpd.conf';
+		$apachectl = '/usr/local/apache/bin/apachectl';
+	}
+	if (! -f $file) { &sorry("$file doesn't exist: $!"); return; }
+	&edit ($file);
+	if (&confirm ('OK to Restart Apache ?')) { system "$apachectl restart"; }
+}
 sub ports {
 	if (! open (P, "netstat -a |")) {
 		&sorry("can't run netstat -a: $!"); return 0;
 	}
-	my @lines; while (<P>) { if (/LISTEN|ESTABLISH/) { push @lines, $_; } }
+	my @lines; while (<P>) {
+		if (/LISTEN|ESTABLISH/) { s/  / /g; push @lines, $_; }
+	}
 	close P;
 	&view ("Ports", join('', @lines));
 }
@@ -171,6 +207,7 @@ sub chkconfig {
 		} else { push @l, $_;
 		}
 	}
+	my $r = `who -r`; $r =~ s/^\s*(\S+\s+\d+).*$/$1/; warn("currently $r");
 	my $task = &choose('chkconfig task ?', 'View', 'Edit');
 	return unless $task;
 	if ($task eq 'Edit') {
@@ -189,6 +226,33 @@ sub chkconfig {
 		&view('chkconfig --list', join("\n", (sort @l ),@xinetdl));
 	}
 	&view ('Daemon configuration', $s);
+}
+sub update_rcd {
+	my $r = `who -r`; $r =~ s/^\s*(\S+\s+\d+).*$/$1/; warn("currently $r");
+	my $task = &choose('update-rc.d task ?', 'View', 'Edit');
+	return unless $task;
+	if ($task eq 'Edit') {
+		if (! opendir(D, '/etc/init.d')) {
+			&sorry("can't opendir /etc/init.d: $!"); return 0;
+		}
+		my @l = sort grep
+		{ !/^\.|^README|\.sh$|S$|^single$|^halt$|^reboot$/ } readdir(D);
+		closedir D;
+		my $service = &choose('Edit which service ?', @l);
+		return unless $service;
+		system "cd /etc ; ls rc[12345].d/S*$service*";
+		my $onoff = &choose("$service at runlevels 2,3,4,5",'on','off');
+		return unless $onoff;
+		if ($onoff eq 'on') {
+			my $startnumber = &choose("start-order number ?", 20 .. 99);
+			system "update-rc.d $service defaults $startnumber";
+		} elsif ($onoff eq 'off') {
+			system "update-rc.d -f $service remove";
+		}
+	} else {
+		local $/;
+		&view('ls /etc/rc[2345].d', `ls -C --tabsize=50 /etc/rc[2345].d`);
+	}
 }
 sub system_config {
 	my $task = &choose('which system-config ?', @system_configs);
@@ -234,5 +298,9 @@ sub shells {
 		closedir D;
 	}
 	sort @shells;
+}
+sub first_existing {
+	my $f = ''; foreach (@_) { if (-e $_) { $f = $_; last; } }
+	return $f;
 }
 sub which { my $f; foreach $d (@PATH) { $f="$d/$_[$[]";  return $f if -x $f; } }

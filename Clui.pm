@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.31';
+$VERSION = '1.32';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -16,8 +16,7 @@ require Exporter;
 @EXPORT_OK = qw(beep tiview back_up get_default set_default timestamp);
 %EXPORT_TAGS = (ALL => [@EXPORT,@EXPORT_OK]);
 
-no strict; # local $^W = 0;
-no warnings;
+no strict; no warnings;
 
 # ------------------------ vt100 stuff -------------------------
 
@@ -851,19 +850,19 @@ Term::Clui.pm - Perl module offering a Command-Line User Interface
 =head1 SYNOPSIS
 
 	use Term::Clui;
-	$chosen = &choose('A Title', @a_list);  # single choice
-	@chosen = &choose('A Title', @a_list);  # multiple choice
+	$chosen = &choose("A Title", @a_list);  # single choice
+	@chosen = &choose("A Title", @a_list);  # multiple choice
 	$x = &choose("Which ?\n(Arrow-keys and Return)", @w); # multi-line question
 	if (&confirm($text)) { &do_something(); };
 	$answer = &ask($question);
 	$answer = &ask($question,$suggestion);
-	$password = &ask_password('Enter password : ');
+	$password = &ask_password("Enter password : ");
 	$newtext = &edit($title, $oldtext);
 	&edit($filename);
 	&view($title, $text)  # if $title is not a filename
 	&view($textfile)  # if $textfile _is_ a filename
 
-	&edit (&choose ('Edit which file ?', grep (-T, readdir D)));
+	&edit (&choose ("Edit which file ?", grep (-T, readdir D)));
 
 =head1 DESCRIPTION
 
@@ -891,7 +890,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.31,
+This is Term::Clui.pm version 1.32,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
@@ -911,7 +910,7 @@ and successive blank lines are collapsed into one.
 If the question will not fit within the available rows, it is truncated.
 
 If the available choice items in a I<&choose> overflow the screen,
-the user is asked to enter 'clue' letters,
+the user is asked to enter "clue" letters,
 and as soon as the items matching them will fit onto the screen
 they are displayed as a choice.
 
@@ -940,7 +939,7 @@ Displays the question, and formats the list items onto the lines beneath it.
 
 If I<choose> is called in a scalar context,
 the user can choose an item using arrow keys (or hjkl) and Return,
-or cancel the choice with a 'q'.
+or cancel the choice with a "q".
 I<choose> then returns the chosen item,
 or I<undefined> if the choice was cancelled.
 
@@ -988,7 +987,7 @@ and subsequent lines are explanation and elaboration.
 
 =item I<confirm>( $question );
 
-Asks the question, takes 'y', 'n', 'Y' or 'N' as a response.
+Asks the question, takes "y", "n", "Y" or "N" as a response.
 If the $question is multi-line, after the response, all but the first
 line is erased, and the first line remains on-screen with I<Yes> or I<No>
 appended after it; you should therefore try to arrange multi-line
@@ -1016,10 +1015,10 @@ and it uses I</dev/tty> rather than I<STDERR> if it can.
 If the I<$text> is longer than a screenful, uses the environment
 variable PAGER ( or I<less> ) to display it.
 If it is one or two lines it just omits the title and displays it.
-Otherwise it uses a simple built-in routine which expects either 'q'
+Otherwise it uses a simple built-in routine which expects either "q"
 or I<Return> from the user; if the user presses I<Return>
 the displayed text remains on the screen and the dialogue continues
-after it, if the user presses 'q' the text is erased.
+after it, if the user presses "q" the text is erased.
 
 =back
 
@@ -1074,6 +1073,34 @@ I<CLUI_DIR = OFF> if you really want to :-(
 
 I<Term::Clui> also consults the environment variables
 HOME, LOGDIR, EDITOR and PAGER, if they are set.
+
+=head1 EXAMPLES
+
+These scripts using Term::Clui and Term::Clui::FileSelect are to
+be found in the I<examples> subdirectory of the build directory.
+You may wish to extend them for your own purposes.
+
+=over 3
+
+=item I<linux_admin>
+
+I use this script a lot at work, for routine system administration of
+linux boxes, particularly Fedora and Debian.  It includes crontab,
+chkconfig, update-rc.d, visudo, vipw, starting and stopping daemons,
+reconfiguring squid samba or apache, editing sysconfig or running
+any of the system-config-* utilities, and much else.
+
+=item I<login_shell>
+
+This script offers the naive user arrow-key-and-return access
+to a text-based browser, a mail client, a news client, ssh and ftp
+and various other stuff.
+
+=item I<test_script>
+
+This is the test script, as used during development.
+
+=back
 
 =head1 AUTHOR
 

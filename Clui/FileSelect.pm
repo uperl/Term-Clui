@@ -8,14 +8,14 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.31';
+$VERSION = '1.32';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw(new select_file);
 @EXPORT_OK = qw();
 
-no strict; local $^W = 0;
+no strict; no warnings;
 
 sub new {
 	my $arg1 = shift;
@@ -87,7 +87,8 @@ sub select_file {   my %option = @_;
       if ($option{'-Executable'}) { @files = grep(-x "$dir/$_", @files); }
       if ($option{'-Writeable'})  { @files = grep(-w "$dir/$_", @files); }
       if ($option{'-Readable'})   { @files = grep(-r "$dir/$_", @files); }
-		@allfiles = (@pre, sort (@dirs,@files), @post); # reconstitute @allfiles
+		@_ = (@dirs,@files);   # 20050910 Bert Jahn's anti-warning device
+		@allfiles = (@pre, sort @_, @post); # reconstitute @allfiles
 
 		my $title;
       if ($option{'-Title'}) { $title = "$option{'-Title'} in $dir"
@@ -117,8 +118,7 @@ sub select_file {   my %option = @_;
 			}
 			if (-d $file) {  # pre-existing directory ?
 				if ($option{'-SelDir'}) { return $file;
-				} else {
-					$dir = $file; if ($dir =~ m#[^/]$#) { $dir .= '/'; } next;
+				} else { $dir=$file; if ($dir =~ m#[^/]$#) { $dir.='/'; } next;
 				}
 			}
 			$file =~ m#^(.*/)([^/]+)$#;
@@ -130,8 +130,8 @@ sub select_file {   my %option = @_;
       }
       return '' unless $new;
       if ($new eq './' && $option{'-SelDir'}) { return $dir; }
-      if ($new =~ m#^/#) { $file = $new;  # abs filename
-      } else { $file = "$dir$new";        # rel filename (slash always at end)
+      if ($new =~ m#^/#) { $file = $new; # abs filename
+      } else { $file = "$dir$new";       # rel filename (slash always at end)
       }
       if ($new eq '../') { $dir =~ s#[^/]+/?$##; &back_up(); next;
       } elsif ($new eq './') {
@@ -168,7 +168,7 @@ and of Tk::SimpleFileSelect,
 but various new options are introduced, namely I<-TopDir>,
 I<-TextFile>, I<-Readable>, I<-Writeable>, I<-Executable> and I<-Owned>.
 
-This is Term::Clui::FileSelect.pm version 1.31,
+This is Term::Clui::FileSelect.pm version 1.32,
 #COMMENT#.
 
 =head1 SUBROUTINES
