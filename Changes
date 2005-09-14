@@ -28,3 +28,4 @@
 20050121 1.30 test.pl uses Test::Simple
 20050831 1.31 test.pl uses warnings; oct/chr/ord confusion fixed in Clui.pm
 20050911 1.32 FileSelect.pm fix "sort interpreted as function" warning
+20050914 1.33 FileSelect.pm fix sort bug in line 90

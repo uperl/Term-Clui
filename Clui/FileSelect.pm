@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.32';
+$VERSION = '1.33';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
@@ -87,8 +87,7 @@ sub select_file {   my %option = @_;
       if ($option{'-Executable'}) { @files = grep(-x "$dir/$_", @files); }
       if ($option{'-Writeable'})  { @files = grep(-w "$dir/$_", @files); }
       if ($option{'-Readable'})   { @files = grep(-r "$dir/$_", @files); }
-		@_ = (@dirs,@files);   # 20050910 Bert Jahn's anti-warning device
-		@allfiles = (@pre, sort @_, @post); # reconstitute @allfiles
+		@allfiles = (@pre, (sort @dirs,@files), @post); # reconstitute @allfiles
 
 		my $title;
       if ($option{'-Title'}) { $title = "$option{'-Title'} in $dir"
@@ -168,7 +167,7 @@ and of Tk::SimpleFileSelect,
 but various new options are introduced, namely I<-TopDir>,
 I<-TextFile>, I<-Readable>, I<-Writeable>, I<-Executable> and I<-Owned>.
 
-This is Term::Clui::FileSelect.pm version 1.32,
+This is Term::Clui::FileSelect.pm version 1.33,
 #COMMENT#.
 
 =head1 SUBROUTINES

@@ -161,7 +161,7 @@ sub test_select_file {
 	while (1) {
 		foreach (@bool_opts) {
 			$opts{$_} = &choose("option $_ ?",'default','0','1');
-			return unless $opts{$_};
+			return unless defined $opts{$_};
 			if ($opts{$_} eq 'default') { delete $opts{$_}; }
 		}
 		foreach (@text_opts) {
