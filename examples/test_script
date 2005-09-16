@@ -155,20 +155,25 @@ sub test_view {
 
 sub test_select_file {
 	my @bool_opts = ('-Chdir','-Create','-ShowAll','-DisableShowAll',
-		'-SelDir','-TextFile','-Readable','-Writeable','-Executable','-Owned');
+		'-SelDir','-TextFile','-Readable','-Writeable','-Executable','-Owned',
+		'-Directory');
 	my @text_opts = ('-FPat','-File','-Path','-Title','-TopDir');
+	my $multiple = &choose('Select','Single file','Multiple files');
+	if ($multiple eq 'Multiple files') { shift @bool_opts; shift @bool_opts; }
 	my %opts;
-	while (1) {
-		foreach (@bool_opts) {
-			$opts{$_} = &choose("option $_ ?",'default','0','1');
-			return unless defined $opts{$_};
-			if ($opts{$_} eq 'default') { delete $opts{$_}; }
-		}
-		foreach (@text_opts) {
-			$opts{$_} = &ask("option $_ ?", $opts{$_});
-			if (! $opts{$_}) { delete $opts{$_}; }
-		}
+	foreach (@bool_opts) {
+		$opts{$_} = &choose("option $_ ?",'default','0','1');
+		return unless defined $opts{$_};
+		if ($opts{$_} eq 'default') { delete $opts{$_}; }
+	}
+	foreach (@text_opts) {
+		$opts{$_} = &ask("option $_ ?", $opts{$_});
+		if (! $opts{$_}) { delete $opts{$_}; }
+	}
+	if ($multiple eq 'Multiple files') {
+		my @files = &select_file(-Chdir=>0, %opts);
+		print STDERR "You selected @files\n";
+	} else {
 		print STDERR "You selected " .&select_file(%opts), "\n";
-		last unless &confirm('Another test of FileSelector ?');
 	}
 }

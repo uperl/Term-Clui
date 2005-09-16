@@ -8,23 +8,14 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.33';
+$VERSION = '1.34';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw(new select_file);
+@EXPORT = qw(select_file);
 @EXPORT_OK = qw();
 
 no strict; no warnings;
-
-sub new {
-	my $arg1 = shift;
-	my $class = ref($arg1) || $arg1; # can be used as class or instance method
-	my $self  = {};   # ref to an empty hash
-	bless $self, $class;
-	$self->_initialise();
-	return $self;
-}
 
 my $home = $ENV{HOME} || $ENV{LOGDIR} || (getpwuid($>))[$[+7];
 $home =~ s#([^/])$#$1/#;
@@ -33,7 +24,14 @@ sub select_file {   my %option = @_;
 	if (!defined $option{'-Path'}) { $option{'-Path'}=$option{'-initialdir'}; }
 	if (!defined $option{'-FPat'}) { $option{'-FPat'}=$option{'-filter'}; }
 	if (!defined $option{'-ShowAll'}) {$option{'-ShowAll'}=$option{'-dotfiles'};}
-	if (!defined $option{'-Chdir'})   {$option{'-Chdir'} = 1;}
+	if ($option{'-Directory'}) { $option{'-Chdir'}=1; $option{'-SelDir'}=1; }
+	my $multichoice = 0;
+	if (wantarray && !$option{'-Chdir'} && !$option{'-Create'}) {
+		$option{'-DisableShowAll'} = 1;
+		$multichoice = 1;
+	} elsif (!defined $option{'-Chdir'}) {
+		$option{'-Chdir'} = 1;
+	}
 
 	if ($option{'-Path'} && -d $option{'-Path'}) {
 		$dir=$option{'-Path'};
@@ -65,7 +63,9 @@ sub select_file {   my %option = @_;
 		}
 		# split @allfiles into @files and @dirs for option processing ...
 		@dirs  = grep(-d "$dir/$_" && -r "$dir/$_", @allfiles);
-		if ($option{'-FPat'}) {
+		if ($option{'-Directory'}) {
+			@files = ();
+		} elsif ($option{'-FPat'}) {
 			@files = grep(!-d $_, glob("$dir/$option{'-FPat'}"));
 			my $length = $[ + 1 + length $dir;
 			foreach (@files) { $_ = substr $_, $length; }
@@ -80,6 +80,8 @@ sub select_file {   my %option = @_;
 				# must check for symlinks to outside the TopDir ...
 			} else { unshift @pre, '../';
 			}
+		} elsif (!$option{'-SelDir'}) {
+			@dirs = ();
 		}
 		if ($option{'-Create'})     { unshift @post, 'Create New File'; }
       if ($option{'-TextFile'})   { @files = grep(-T "$dir/$_", @files); }
@@ -95,6 +97,12 @@ sub select_file {   my %option = @_;
 		}
 		if ($option{'-File'} && dbmopen (%CHOICES, "$home/db/choices", 0600)) {
 			$CHOICES{$title} = $option{'-File'}; dbmclose %CHOICES;
+		}
+		if ($multichoice) {
+			my @new = &choose ($title, @allfiles);
+      	return '' unless @new;
+			foreach (@new) { $_="$dir$_"; }
+			return @new;
 		}
       $new = &choose ($title, @allfiles);
 
@@ -148,13 +156,15 @@ __END__
 
 =head1 NAME
 
-Term::Clui::FileSelect.pm - Perl module to ask the user to select a file.
+Term::Clui::FileSelect - Perl module to ask the user to select a file.
 
 =head1 SYNOPSIS
 
   use Term::Clui;
   use Term::Clui::FileSelect;
-  $file = &select_file(-Readable=>1, -TopDir=>'/home/www', -FPat=>'*.html');
+  $file = &select_file(-Readable=>1, -TopDir=>"/home", -FPat=>"*.html");
+  @files = &select_file(-Chdir=>0, -Path=$ENV{PWD}, -FPat=>"*.mp3");
+  chdir &select_file(-Directory=>1, -Path=$ENV{PWD});
 
 =head1 DESCRIPTION
 
@@ -164,10 +174,15 @@ It offers I<Rescan> and I<ShowAll> buttons.
 To ease the re-learning burden for the programmer,
 the options are modelled on those of Tk::FileDialog
 and of Tk::SimpleFileSelect,
-but various new options are introduced, namely I<-TopDir>,
-I<-TextFile>, I<-Readable>, I<-Writeable>, I<-Executable> and I<-Owned>.
+but various new options are introduced, namely I<-TopDir>, I<-TextFile>,
+I<-Readable>, I<-Writeable>, I<-Executable>, I<-Owned> and I<-Directory>
 
-This is Term::Clui::FileSelect.pm version 1.33,
+Multiple choice is possible in a limited circumstance;
+when I<file_select> is invoked in a list context, with -Chdir=>0
+and without -Create.  It is currently not possible
+to select multiple files lying in different directories.
+
+This is Term::Clui::FileSelect.pm version 1.34,
 #COMMENT#.
 
 =head1 SUBROUTINES
@@ -185,6 +200,8 @@ This is Term::Clui::FileSelect.pm version 1.33,
 =item I<-Chdir>
 
 Enable the user to change directories. The default is 1.
+If it is set to 0, and I<select_file> is invoked in a list context,
+and I<-Create> is not set, then the user can select multiple files.
 
 =item I<-Create>
 
@@ -204,13 +221,13 @@ status of the ShowAll flag. The default is 0
 
 If True, enables selection of a directory rather than a file.
 The default is 0.
-There is currently no way to I<enforce> selection of a directory . . .
+To I<enforce> selection of a directory, use the I<-Directory> option.
 
 =item I<-FPat> or I<-filter>
 
-Sets the default file selection pattern, in 'glob' format, e.g. I<*.html>.
+Sets the default file selection pattern, in glob format, e.g. I<*.html>.
 Only files matching this pattern will be displayed.
-The default is '*'.
+The default is "*".
 
 =item I<-File>
 
@@ -220,11 +237,11 @@ The default default is whatever the user selected last time in this directory.
 =item I<-Path> or I<-initialdir>
 
 The path of the selected file, or the initial path.
-The default is $ENV{'HOME'}.
+The default is $ENV{HOME}.
 
 =item I<-Title>
 
-The Title of the dialog box. The default is 'in directory I</where/ever>'.
+The Title of the dialog box. The default is "in directory I</where/ever>".
 
 =item I<-TopDir>
 
@@ -249,11 +266,16 @@ Only writeable files will be displayed. The default is 0.
 Only executable files will be displayed.
 The default is 0.
 
-=item I<-Owned>.
+=item I<-Owned>
 
 Only files owned by the current user will be displayed.
 This is useful if the user is being asked to choose a file for a I<chmod>
 or I<chgrp> operation, for example.
+The default is 0.
+
+=item I<-Directory>
+
+Only directories will be displayed.
 The default is 0.
 
 =back
@@ -274,12 +296,12 @@ with the options modelled after I<Tk::FileDialog> and I<Tk::SimpleFileSelect>.
 
 =head1 SEE ALSO
 
-http://www.pjb.com.au/,
-http://www.cpan.org/SITES.html,
-Term::Clui,
-Tk::FileDialog,
-Tk::SimpleFileSelect,
-perl(1).
+http://www.pjb.com.au/ ,
+http://search.cpan.org/~pjb ,
+Term::Clui ,
+Tk::FileDialog ,
+Tk::SimpleFileSelect ,
+perl(1) .
 
 =cut
 
