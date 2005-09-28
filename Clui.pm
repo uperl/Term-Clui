@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.34';
+$VERSION = '1.35';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -890,7 +890,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.34,
+This is Term::Clui.pm version 1.35,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
@@ -1078,7 +1078,6 @@ HOME, LOGDIR, EDITOR and PAGER, if they are set.
 
 These scripts using Term::Clui and Term::Clui::FileSelect are to
 be found in the I<examples> subdirectory of the build directory.
-You may wish to extend them for your own purposes.
 
 =over 3
 
@@ -1089,6 +1088,13 @@ linux boxes, particularly Fedora and Debian.  It includes crontab,
 chkconfig, update-rc.d, visudo, vipw, starting and stopping daemons,
 reconfiguring squid samba or apache, editing sysconfig or running
 any of the system-config-* utilities, and much else.
+
+=item I<audio_stuff>
+
+This script offers an arrow-key-and-return interface integrating
+aplaymidi, cdrecord, cdda2wav, lame, mkisofs, muscript, normalize,
+sndfile-play, timidity and so on, allowing audio files to be ripped,
+burned, played, or converted between Muscript, MIDI, WAV and MP3 formats.
 
 =item I<login_shell>
 

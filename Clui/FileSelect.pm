@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.34';
+$VERSION = '1.35';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
@@ -100,7 +100,7 @@ sub select_file {   my %option = @_;
 		}
 		if ($multichoice) {
 			my @new = &choose ($title, @allfiles);
-      	return '' unless @new;
+      	return () unless @new;
 			foreach (@new) { $_="$dir$_"; }
 			return @new;
 		}
@@ -135,7 +135,7 @@ sub select_file {   my %option = @_;
 			if (!-d $1) { &sorry ("directory $1 does not exist."); next; }
 			&sorry ("directory $1 is not writeable."); next;
       }
-      return '' unless $new;
+      return undef unless $new;
       if ($new eq './' && $option{'-SelDir'}) { return $dir; }
       if ($new =~ m#^/#) { $file = $new; # abs filename
       } else { $file = "$dir$new";       # rel filename (slash always at end)
@@ -182,7 +182,7 @@ when I<file_select> is invoked in a list context, with -Chdir=>0
 and without -Create.  It is currently not possible
 to select multiple files lying in different directories.
 
-This is Term::Clui::FileSelect.pm version 1.34,
+This is Term::Clui::FileSelect.pm version 1.35,
 #COMMENT#.
 
 =head1 SUBROUTINES
@@ -227,6 +227,9 @@ To I<enforce> selection of a directory, use the I<-Directory> option.
 
 Sets the default file selection pattern, in glob format, e.g. I<*.html>.
 Only files matching this pattern will be displayed.
+If you want multiple patterns, you can use formats like
+I<*.[ch]> or
+I<{*.cgi,*.pl}> - see I<File::Glob> for more details.
 The default is "*".
 
 =item I<-File>
@@ -241,7 +244,11 @@ The default is $ENV{HOME}.
 
 =item I<-Title>
 
-The Title of the dialog box. The default is "in directory I</where/ever>".
+The Title of the dialog box.
+If I<-Title> is specified,
+then Clui::FileSelect dynamically appends "in I</where/ever>" to it.
+If I<-Title> is not specified,
+Clui::FileSelect displays "in directory I</where/ever>".
 
 =item I<-TopDir>
 
@@ -298,6 +305,7 @@ with the options modelled after I<Tk::FileDialog> and I<Tk::SimpleFileSelect>.
 
 http://www.pjb.com.au/ ,
 http://search.cpan.org/~pjb ,
+File::Glob ,
 Term::Clui ,
 Tk::FileDialog ,
 Tk::SimpleFileSelect ,
