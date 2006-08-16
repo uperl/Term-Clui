@@ -154,3 +154,45 @@ sub SSH {
 	} else { system "ssh $host";
 	}
 }
+
+=pod
+
+=head1 NAME
+
+login_shell - wrapper for text-based browser, mail, news, ssh, ftp etc.
+
+
+=head1 SYNOPSIS
+
+$ audio_stuff
+
+=head1 DESCRIPTION
+
+This script offers the naive user arrow-key-and-return access to a
+text-based browser, a mail client, a news client, ssh, ftp, man
+and various other stuff.
+
+=head1 AUTHOR
+
+Peter J Billam  www.pjb.com.au/comp/contact.html
+
+=head1 CREDITS
+
+Based on Term::Clui
+
+=head1 SEE ALSO
+
+http://www.pjb.com.au/ ,
+http://search.cpan.org/~pjb , 
+Term::Clui,
+Term::Clui::FileSelect,
+lynx(1),
+slrn(1),
+pine(1),
+ssh(1),
+ftp(1),
+make(1),
+man(1)
+
+=cut
+

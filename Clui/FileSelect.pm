@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.35';
+$VERSION = '1.36';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
@@ -160,11 +160,11 @@ Term::Clui::FileSelect - Perl module to ask the user to select a file.
 
 =head1 SYNOPSIS
 
-  use Term::Clui;
-  use Term::Clui::FileSelect;
-  $file = &select_file(-Readable=>1, -TopDir=>"/home", -FPat=>"*.html");
-  @files = &select_file(-Chdir=>0, -Path=$ENV{PWD}, -FPat=>"*.mp3");
-  chdir &select_file(-Directory=>1, -Path=$ENV{PWD});
+ use Term::Clui;
+ use Term::Clui::FileSelect;
+ $file = &select_file(-Readable=>1, -TopDir=>"/home", -FPat=>"*.html");
+ @files = &select_file(-Chdir=>0, -Path=$ENV{PWD}, -FPat=>"*.mp3");
+ chdir &select_file(-Directory=>1, -Path=$ENV{PWD});
 
 =head1 DESCRIPTION
 
@@ -182,7 +182,7 @@ when I<file_select> is invoked in a list context, with -Chdir=>0
 and without -Create.  It is currently not possible
 to select multiple files lying in different directories.
 
-This is Term::Clui::FileSelect.pm version 1.35,
+This is Term::Clui::FileSelect.pm version 1.36,
 #COMMENT#.
 
 =head1 SUBROUTINES

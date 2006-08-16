@@ -304,3 +304,50 @@ sub first_existing {
 	return $f;
 }
 sub which { my $f; foreach $d (@PATH) { $f="$d/$_[$[]";  return $f if -x $f; } }
+
+
+=pod
+
+=head1 NAME
+
+linux_admin - wrapper script for routine sysadmin of linux boxes
+
+=head1 SYNOPSIS
+
+# linux_admin
+
+=head1 DESCRIPTION
+
+This script, which comes along with the I<Term::Clui> Perl-module in its
+I<examples> directory,
+performs routine system administration
+of linux boxes, particularly Fedora and Debian.
+It integrates various programs such as
+crontab, chkconfig, update-rc.d, visudo, vipw, starting and stopping
+daemons, reconfiguring squid samba or apache, editing sysconfig or
+running any of the system-config-* utilities, and much else.
+
+=head1 AUTHOR
+
+Peter J Billam  www.pjb.com.au/comp/contact.html
+
+=head1 CREDITS
+
+Based on Term::Clui
+
+=head1 SEE ALSO
+
+http://www.pjb.com.au/ ,
+http://search.cpan.org/~pjb , 
+Term::Clui,
+crontab(1),
+chkconfig(1),
+update-rc.d(1),
+visudo(1),
+vipw(1),
+squid(1),
+samba(1),
+apache(1)
+
+=cut
+

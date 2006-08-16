@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.35';
+$VERSION = '1.36';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -849,20 +849,20 @@ Term::Clui.pm - Perl module offering a Command-Line User Interface
 
 =head1 SYNOPSIS
 
-	use Term::Clui;
-	$chosen = &choose("A Title", @a_list);  # single choice
-	@chosen = &choose("A Title", @a_list);  # multiple choice
-	$x = &choose("Which ?\n(Arrow-keys and Return)", @w); # multi-line question
-	if (&confirm($text)) { &do_something(); };
-	$answer = &ask($question);
-	$answer = &ask($question,$suggestion);
-	$password = &ask_password("Enter password : ");
-	$newtext = &edit($title, $oldtext);
-	&edit($filename);
-	&view($title, $text)  # if $title is not a filename
-	&view($textfile)  # if $textfile _is_ a filename
+ use Term::Clui;
+ $chosen = &choose("A Title", @a_list);  # single choice
+ @chosen = &choose("A Title", @a_list);  # multiple choice
+ $x = &choose("Which ?\n(Arrow-keys and Return)", @w); # multi-line question
+ if (&confirm($text)) { &do_something(); };
+ $answer = &ask($question);
+ $answer = &ask($question,$suggestion);
+ $password = &ask_password("Enter password : ");
+ $newtext = &edit($title, $oldtext);
+ &edit($filename);
+ &view($title, $text)  # if $title is not a filename
+ &view($textfile)  # if $textfile _is_ a filename
 
-	&edit (&choose ("Edit which file ?", grep (-T, readdir D)));
+ &edit (&choose ("Edit which file ?", grep (-T, readdir D)));
 
 =head1 DESCRIPTION
 
@@ -890,7 +890,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.35,
+This is Term::Clui.pm version 1.36,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
@@ -1060,8 +1060,8 @@ as it handles DBM's problem with concurrent accesses.
 =head1 DEPENDENCIES
 
 It requires Exporter, which is core Perl.
-It uses Term::Size.pm if it's available;
-if not, it tries `tput` before guessing 80x24.
+It uses Term::Size if it's available;
+if not, it tries I<tput> before guessing 80x24.
 
 =head1 ENVIRONMENT
 
@@ -1093,7 +1093,7 @@ any of the system-config-* utilities, and much else.
 
 This script offers an arrow-key-and-return interface integrating
 aplaymidi, cdrecord, cdda2wav, lame, mkisofs, muscript, normalize,
-sndfile-play, timidity and so on, allowing audio files to be ripped,
+mpg123, sndfile-play, timidity and so on, allowing audio files to be ripped,
 burned, played, or converted between Muscript, MIDI, WAV and MP3 formats.
 
 =item I<login_shell>

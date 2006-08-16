@@ -39,14 +39,11 @@ time then &choose highlights it as the default. Thus &choose manages
 its own defaults and menus using Term::Clui autoconfigure themselves
 to the user's preferences.
 
-&select_file obeys options modelled after those of Tk::FileDialog.pm
-and Tk::SimpleFileSelect.pm
-
 The programmer can pass &ask a default string  as an optional second
 argument.  &choose handles big lists gracefully, asking the user for
-a substring clue (very cool..),  and when called in an array context,
-offers the user multiple choice.  A highly featured File-Selector is
-included.
+a substring clue (very cool..), and when called in an array context,
+offers the user multiple choice. &select_file obeys options modelled
+after those of Tk::FileDialog.pm and Tk::SimpleFileSelect.pm
 
 Term::Clui is fast,  very easy for both programmer and user, and has
 few external dependencies. It doesn't use curses which is a whole-of
@@ -55,5 +52,5 @@ sequences (up left right normal reverse and clrtoeol).   It requires
 only Exporter, which is core Perl.   It handles window size changes,
 using Term::Size.pm if available; if not, it tries `tput`.
 
-Peter Billam    peter.billam@pjb.com.au    http://www.pjb.com.au
+Peter Billam                http://www.pjb.com.au/comp/contact.html
 

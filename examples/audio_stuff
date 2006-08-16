@@ -28,6 +28,9 @@
 
 #  .wav files can be played with
 #  sndfile-play whatever.wav
+#  .mpg files can be played with
+#  sndfile-play whatever.mpg  or
+#  mpg123 whatever.mpg
 
 while ($ARGV[$[] =~ /^-([a-z])/) {
    if ($1 eq 'e')      { &whatever; shift;
@@ -47,6 +50,7 @@ my $lame         = &which('lame');
 my $cdrecord     = &which('cdrecord');
 my $cdda2wav     = &which('cdda2wav');
 my $sndfile_play = &which('sndfile-play');
+my $mpg123       = &which('mpg123');
 my $aplaymidi    = &which('aplaymidi');
 my $arecordmidi  = &which('arecordmidi');
 my $normalize    = &which('normalize');
@@ -92,7 +96,6 @@ sub burn_wav {
 sub burn_mp3 {
 	if (! $mkisofs)  { &sorry("you need to install mkisofs.");  return; }
 	if (! $cdrecord) { &sorry("you need to install cdrecord."); return; }
-	&sorry("not yet implemented");
 }
 sub rip_wav {
 	if (! $cdda2wav) { &sorry("you need to install cdda2wav."); return; }
@@ -130,7 +133,6 @@ sub rip_wav {
 	if ($track) { system "$cdda2wav -H -Q -x -Owav -t $track+$track"; }
 }
 sub rip_mp3 {
-	&sorry("not yet implemented");
 }
 sub wav2mp3 {
 	if (! $lame) { &sorry("you need to install lame."); return; }
@@ -182,15 +184,23 @@ sub mid2mp3 {
 		my $oo = $o; $oo =~ s/wav$/mp3/;
 		if (-f $oo && !&confirm("OK to overwrite $oo ?")) { next; }
 		system "$lame -h $o $oo";
+		unlink $o;
 	}
 }
 sub play {
 	my $file = &select_file(-Readable=>1, -Path=>$ENV{PWD},
 		-FPat=>'{*.wav,*.mp3,*.mid}');
 	return unless $file;
-	if ($file =~ /\.wav$|\.mp3$/) {
+	if ($mpg123 && $file =~ /\.mp3$/) {
+		system "$mpg123 $file";
+		return;
+	} elsif ($file =~ /\.wav$|\.mp3$/) {
 		if (! $sndfile_play) {
-			&sorry("you need to install sndfile_play."); return;
+			if ($file =~ /\.mp3$/) {
+				&sorry("you need to install mpg123 or sndfile-play."); return;
+			} else {
+				&sorry("you need to install sndfile-play."); return;
+			}
 		}
 		system "$sndfile_play $file";
 		return;
@@ -559,7 +569,9 @@ from I<.wav> format into I<.mp3> format or vice-versa.
 =item I<play WAV,MP3,MID>
 
 Depending on which file you select,
-this feature either uses I<sndfile-play> to play a I<.wav> or I<.mp3> file
+this feature either uses
+I<mpg123> to play a I<.mp3> file, or
+I<sndfile-play> to play a I<.wav> or I<.mp3> file
 to the headphones, or I<aplaymidi> to send a I<.mid> file to a
 Synthesiser.
 
@@ -572,7 +584,7 @@ Peter J Billam  www.pjb.com.au/comp/contact.html
 =head1 CREDITS
 
 Based on Term::Clui, aplaymidi, arecordmidi, cdrecord, cdda2wav,
-lame, normalize, sndfile_play and timidity.
+lame, normalize, mpg123, sndfile_play and timidity.
 
 =head1 SEE ALSO
 
