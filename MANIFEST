@@ -6,6 +6,7 @@ Makefile.PL
 test.pl
 MANIFEST
 README
+META.yml
 examples/login_shell
 examples/test_script
 examples/linux_admin

@@ -132,6 +132,7 @@ EOT
 
 	my @colours = ('Red','Orange','Black','Grey','Blue');
 	$colour = &choose ('Your favourite colour ?', @colours);
+	return unless $colour;
 	%names = (
 		Red=>'Fred', Orange=>'Solange', Black=>'Jack', Grey=>'May', Blue=>'Sue',
 	);

@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.36';
+$VERSION = '1.37';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -17,6 +17,16 @@ require Exporter;
 %EXPORT_TAGS = (ALL => [@EXPORT,@EXPORT_OK]);
 
 no strict; no warnings;
+
+my $have_Term_ReadKey = 1;
+my $have_Term_Size = 0;
+eval 'require "Term/ReadKey.pm"';
+if ($@) {
+	$have_Term_ReadKey = 0;
+	my $have_Term_Size = 1;
+	eval 'require "Term/Size.pm"';
+	if ($@) { $have_Term_Size = 0; }
+}
 
 # ------------------------ vt100 stuff -------------------------
 
@@ -29,13 +39,13 @@ $KEY_LEFT  = 0404;
 $KEY_RIGHT = 0405;
 $KEY_DOWN  = 0402;
 $KEY_ENTER = "\r";
-$KEY_ENTER .= '';  # circumvent stupid bloody -w warning
+$KEY_ENTER .= q{};  # circumvent stupid bloody -w warning
 $KEY_PPAGE = 0523;
 $KEY_NPAGE = 0522;
 $KEY_BTAB  = 0541;
 
 my $irow; my $icol;   # maintained by &puts, &up, &down, &left and &right
-sub puts   { my $s = join '', @_;
+sub puts   { my $s = join q{}, @_;
 	$irow += ($s =~ tr/\n/\n/);
 	if ($s =~ /\r$/) { $icol = 0; }   # should increment otherwise ...
 	print TTY $s;
@@ -58,49 +68,62 @@ sub red      { print TTY "\033[31m"; }
 sub green    { print TTY "\033[32m"; }
 sub blue     { print TTY "\033[34m"; }
 sub violet   { print TTY "\033[35m"; }
-my ($rin, $nfound, $timeleft);  # for use by select
+
+sub getc_wrapper { my $timeout = 0 + $_[$[];
+	if ($have_Term_ReadKey) {
+		return Term::ReadKey::ReadKey($timeout, *TTYIN);
+	} else {
+		#if ($timeout > 0.00001) {  # doesn't seem to work on openbsd...
+		#	my $rin = q{};
+		#	vec($rin,fileno(TTYIN),1) = 1;
+		#	my $nfound = select($rin, undef, undef, $timeout);
+		#	if (!$nfound) { return undef; }
+		#}
+		return getc(TTYIN);
+	}
+}
+
 sub getch {
-	my $c = getc(TTYIN);
+	my $c = getc_wrapper(0);
 	if ($c eq "\033") {
-		#($nfound, $timeleft)= select($rout=$rin, undef, undef, 0.05);
-		# warn "nfound=$nfound\n";  # always 0 on FreeBSD's cons25l1 :-(
-		#if (! $nfound) {return "\033"; }
-		$c = getc(TTYIN);
-		if ($c eq "A") { return($KEY_UP); }
-		if ($c eq "B") { return($KEY_DOWN); }
-		if ($c eq "C") { return($KEY_RIGHT); }
-		if ($c eq "D") { return($KEY_LEFT); }
-		if ($c eq "5") { getc(TTYIN); return($KEY_PPAGE); }
-		if ($c eq "6") { getc(TTYIN); return($KEY_NPAGE); }
-		if ($c eq "Z") { return($KEY_BTAB); }
-		if ($c eq "[") {
-			$c = getc(TTYIN);
-			if ($c eq "A") { return($KEY_UP); }
-			if ($c eq "B") { return($KEY_DOWN); }
-			if ($c eq "C") { return($KEY_RIGHT); }
-			if ($c eq "D") { return($KEY_LEFT); }
-			if ($c eq "5") { getc(TTYIN); return($KEY_PPAGE); }
-			if ($c eq "6") { getc(TTYIN); return($KEY_NPAGE); }
-			if ($c eq "Z") { return($KEY_BTAB); }
+		$c = getc_wrapper(0.10);
+
+		if (! defined $c) { return("\033"); }
+		if ($c eq 'A') { return($KEY_UP); }
+		if ($c eq 'B') { return($KEY_DOWN); }
+		if ($c eq 'C') { return($KEY_RIGHT); }
+		if ($c eq 'D') { return($KEY_LEFT); }
+		if ($c eq '5') { getc_wrapper(0); return($KEY_PPAGE); }
+		if ($c eq '6') { getc_wrapper(0); return($KEY_NPAGE); }
+		if ($c eq 'Z') { return($KEY_BTAB); }
+		if ($c eq '[') {
+			$c = getc_wrapper(0);
+			if ($c eq 'A') { return($KEY_UP); }
+			if ($c eq 'B') { return($KEY_DOWN); }
+			if ($c eq 'C') { return($KEY_RIGHT); }
+			if ($c eq 'D') { return($KEY_LEFT); }
+			if ($c eq '5') { getc_wrapper(0); return($KEY_PPAGE); }
+			if ($c eq '6') { getc_wrapper(0); return($KEY_NPAGE); }
+			if ($c eq 'Z') { return($KEY_BTAB); }
 			return($c);
 		}
 		return($c);
 	} elsif ($c eq ord(0217)) {
-		$c = getc(TTYIN);
-		if ($c eq "A") { return($KEY_UP); }
-		if ($c eq "B") { return($KEY_DOWN); }
-		if ($c eq "C") { return($KEY_RIGHT); }
-		if ($c eq "D") { return($KEY_LEFT); }
+		$c = getc_wrapper(0);
+		if ($c eq 'A') { return($KEY_UP); }
+		if ($c eq 'B') { return($KEY_DOWN); }
+		if ($c eq 'C') { return($KEY_RIGHT); }
+		if ($c eq 'D') { return($KEY_LEFT); }
 		return($c);
 	} elsif ($c eq ord(0233)) {
-		$c = getc(TTYIN);
-		if ($c eq "A") { return($KEY_UP); }
-		if ($c eq "B") { return($KEY_DOWN); }
-		if ($c eq "C") { return($KEY_RIGHT); }
-		if ($c eq "D") { return($KEY_LEFT); }
-		if ($c eq "5") { getc(TTYIN); return($KEY_PPAGE); }
-		if ($c eq "6") { getc(TTYIN); return($KEY_NPAGE); }
-		if ($c eq "Z") { return($KEY_BTAB); }
+		$c = getc_wrapper(0);
+		if ($c eq 'A') { return($KEY_UP); }
+		if ($c eq 'B') { return($KEY_DOWN); }
+		if ($c eq 'C') { return($KEY_RIGHT); }
+		if ($c eq 'D') { return($KEY_LEFT); }
+		if ($c eq '5') { getc_wrapper(0); return($KEY_PPAGE); }
+		if ($c eq '6') { getc_wrapper(0); return($KEY_NPAGE); }
+		if ($c eq 'Z') { return($KEY_BTAB); }
 		return($c);
 	} else {
 		return($c);
@@ -132,53 +155,58 @@ sub goto { my $newcol = shift; my $newrow = shift;
 	}
 }
 sub move { my ($ix,$iy) = @_; printf TTY "\033[%d;%dH",$iy+1,$ix+1; }
-my $initscr_already_run = 0; my $stty = '';
+
+my $initscr_already_run = 0; my $stty = q{};
+
 sub initscr {
 	if ($initscr_already_run) {
 		$icol = 0; $irow = 0; $initscr_already_run++; return;
 	}
 	open(TTY, ">/dev/tty")  || (warn "Can't write /dev/tty: $!\n", return 0);
-	$stty = `stty -g`; chop $stty;
+	if (!$have_Term_ReadKey) { $stty = `stty -g`; chop $stty; }
 	open(TTYIN, "</dev/tty") || (warn "Can't read /dev/tty: $!\n", return 0);
 
-	if ($^O =~ /^FreeBSD$/i) { system("stty -echo -icrnl raw </dev/tty");
-	} else { system("stty -echo -icrnl raw </dev/tty >/dev/tty");
+	if ($have_Term_ReadKey) {
+		Term::ReadKey::ReadMode('ultra-raw', *TTYIN);
+	} else {
+		if ($^O =~ /^FreeBSD$/i) { system("stty -echo -icrnl raw </dev/tty");
+		} else { system("stty -echo -icrnl raw </dev/tty >/dev/tty");
+		}
 	}
-	# system("stty -echo -icrnl raw </dev/tty");  # various old tries ...
-	# system("stty -echo -icrnl raw");
-	# if ($bsd) { system "stty cbreak </dev/tty >/dev/tty 2>&1";
-	# } else { system "stty", '-icanon'; system "stty", 'eol', "\001";
-	# }
 
 	select((select(TTY), $| = 1)[$[]); print TTY "";
-	$rin = ''; vec($rin, fileno(TTYIN), 1) = 1;
+	$rin = q{}; vec($rin, fileno(TTYIN), 1) = 1;
 	$icol = 0; $irow = 0; $initscr_already_run = 1;
 }
 sub endwin {
 	print TTY "\033[0m";
 	if ($initscr_already_run > 1) { $initscr_already_run--; return; }
-	close TTY; close TTYIN;
-	if ($^O =~ /^FreeBSD$/i) { system("stty $stty </dev/tty") if $stty;
-	} else { system("stty $stty </dev/tty >/dev/tty") if $stty;
+	if ($have_Term_ReadKey) {
+		Term::ReadKey::ReadMode('restore', *TTYIN);
+		close TTY; close TTYIN;
+	} else {
+		close TTY; close TTYIN;
+		if ($^O =~ /^FreeBSD$/i) { system("stty $stty </dev/tty") if $stty;
+		} else { system("stty $stty </dev/tty >/dev/tty") if $stty;
+		}
 	}
 	$initscr_already_run = 0;
 }
 
 # ----------------------- size handling ----------------------
 
-my ($must_use_tput, $maxcols, $maxrows); my $size_changed = 1;
+my ($maxcols, $maxrows); my $size_changed = 1;
 my ($otherlines, @otherlines, $notherlines);
-
-eval 'require "Term/Size.pm"';
-if ($@) { $must_use_tput = 1; }
 
 sub check_size {
 	if (! $size_changed) { return; }
-	if ($must_use_tput) {
+	if ($have_Term_ReadKey) {
+		($maxcols, $maxrows) = Term::ReadKey::GetTerminalSize(*STDERR);
+	} elsif ($have_Term_Size) {
+		($maxcols, $maxrows) = Term::Size::chars(*STDERR);
+	} else {
 		$maxcols = `tput cols`;
 		$maxrows = (`tput lines` + 0) || (`tput rows` + 0);
-	} else {
-		($maxcols, $maxrows) = &Term::Size::chars(*STDERR);
 	}
 	$maxcols = $maxcols || 80; $maxcols--;
 	$maxrows = $maxrows || 24;
@@ -201,13 +229,13 @@ sub ask_password { # no echo - use for passwords
 	local ($silent) = 'yes'; &ask ($_[$[]);
 }
 sub ask { my ($question, $default) = @_;
-	return '' unless $question;
+	return q{} unless $question;
 	&initscr(); my $nol = &display_question($question);
 
 	my $i = 0; my $n = 0; my @s = (); # cursor position, length, string
 	if ($default) {
 		$default =~ s/\t/	/g;
-		@s = split ('', $default); $n = scalar @s; $i = $[;
+		@s = split (q{}, $default); $n = scalar @s; $i = $[;
 		foreach $j ($[ .. $n) { &puts($s[$j]); }
 		&left($n);
 	}
@@ -241,7 +269,7 @@ sub ask { my ($question, $default) = @_;
 		} else { &beep();
 		}
 	}
-	&endwin(); $silent = ''; return join("", @s);
+	&endwin(); $silent = q{}; return join("", @s);
 }
 
 # ----------------------- choose stuff -------------------------
@@ -378,7 +406,8 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 				if ($nrows >= $maxrows) {
 					@list = &narrow_the_search(@list);
 					if (! @list) {
-						&up(1); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
+						&up(1); &clrtoeol(); &endwin ();
+						$clue_has_been_given = 0;
 						return wantarray ? () : undef;
 					}
 				}
@@ -389,7 +418,9 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 			my @chosen;
 			if (wantarray) {
 				my $i; for ($i=$[; $i<=$#list; $i++) {
-					if ($marked[$i] || $i==$this_cell) { push @chosen, $list[$i]; }
+					if ($marked[$i] || $i==$this_cell) {
+						push @chosen, $list[$i];
+					}
 				}
 				&clrtoeol();
 				my $remaining = $maxcols-$firstlinelength;
@@ -422,7 +453,8 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 			if (wantarray) {
 				$marked[$this_cell] = !$marked[$this_cell];
 				if ($this_cell < $#list) {
-					$this_cell++; &wr_cell($this_cell-1); &wr_cell($this_cell); 
+					$this_cell++;
+					&wr_cell($this_cell-1); &wr_cell($this_cell); 
 				}
 			} elsif ($this_cell < $#list) {
 				$this_cell++; &wr_cell($this_cell-1); &wr_cell($this_cell); 
@@ -489,15 +521,19 @@ sub narrow_the_search { my @biglist = @_;
 			if ($nrows < $maxrows) { &erase_lines(1); return @list; }
 		}
 		if ($c == $KEY_LEFT && $i > 0) { $i--; &left(1); next;
-		} elsif ($c == $KEY_RIGHT) { if ($i < $n) { &puts($s[$i]); $i++; next; }
+		} elsif ($c == $KEY_RIGHT) {
+			if ($i < $n) { &puts($s[$i]); $i++; next; }
 		} elsif (($c eq "\cH") || ($c eq "\c?")) {
 			if ($i > 0) {
 			 	$n--; $i--; splice(@s, $i, 1); &left(1);
-			  	foreach $j ($i..$n) { &puts($s[$j]); } &clrtoeol(); &left($n-$i);
+			  	foreach $j ($i..$n) { &puts($s[$j]); }
+				&clrtoeol(); &left($n-$i);
 			}
 		# but these should do the "q for quit" job XXX
 		} elsif ($c eq "\cC" || $c eq "\cX" || $c eq "\cD") {  # clear ...
-			if (! @s) { $clue_has_been_given = 0; &erase_lines(1); return (); }
+			if (! @s) {
+				$clue_has_been_given = 0; &erase_lines(1); return ();
+			}
 			&left($i); $i = 0; $n = 0; @s = (); &clrtoeol();
 		} elsif ($c eq "\cB") { &left($i); $i = 0; next;
 		} elsif ($c eq "\cE") { &right($n-$i); $i = $n; next;
@@ -596,7 +632,9 @@ sub confirm { my $question = shift;  # asks user Yes|No, returns 1|0
 	return(0) unless $question;  return(0) unless -t STDERR;
 	&initscr();
 	my $nol = &display_question($question); &puts (" (y/n) ");
-	while (1) { $response=&getch();  last if ($response=~/[yYnN]/);  &beep(); }
+	while (1) {
+		$response=&getch();  last if ($response=~/[yYnN]/);  &beep();
+	}
 	&left(6); &clrtoeol(); 
 	if ($response=~/^[yY]/) { &puts("Yes"); } else { &puts("No"); }
 	&erase_lines(1); &endwin();
@@ -616,7 +654,7 @@ sub edit {	my ($title, $text) = @_;
 		$tmpdir = '/tmp';
 		($safename = $title) =~ s/[\W_]+/_/g;
 		$file = "$tmpdir/$safename.$$";
-		if (!open (F,"> $file")) {&sorry("can't open $file: $!\n");return '';}
+		if (!open (F,">$file")) {&sorry("can't open $file: $!\n");return q{};}
 		print F $text; close F;
 		$editor = $ENV{EDITOR} || "vi"; # should also look in ~/db/choices.db
 		system "$editor $file";
@@ -627,8 +665,8 @@ sub edit {	my ($title, $text) = @_;
 		my $file = $title;
 
 		# weed out no-go situations
-		if (-d $file)  { &sorry ("$file is already a directory\n"); return 0; }
-		if (-B _ && -s _)  { &sorry("$file is not a text file\n");  return 0; }
+		if (-d $file) {&sorry ("$file is already a directory\n"); return 0;}
+		if (-B _ && -s _) {&sorry("$file is not a text file\n"); return 0;}
 		if (-T _ && !-w _) { &view ($file); return 1; }
 	
 		# it's a writeable text file, so work out the locations
@@ -649,7 +687,9 @@ sub edit {	my ($title, $text) = @_;
 		if (-d _ && ! -w _) { $rcs_ok = 0;	warn "can't write in $rcsdir\n"; }
 	
 		# if the file doesn't exist, but the RCS does, then check it out
-		if ($rcs_ok && -f $rcsfile && !-f $file) {system "co -l $file $rcsfile";}
+		if ($rcs_ok && -f $rcsfile && !-f $file) {
+			system "co -l $file $rcsfile";
+		}
 
 		my $starttime = time;
 		$editor = $ENV{EDITOR} || "vi"; # should also look in ~/db/choices.db
@@ -729,7 +769,7 @@ sub view {	my ($title, $text) = @_;	# or ($filename) =
 		} else {
 			local ($safetitle); ($safetitle = $title) =~ s/[^a-zA-Z0-9]+/_/g;
 			local ($tmp) = "/tmp/$safetitle.$$";
-			if (! open (TMP, "> $tmp")) { warn "can't open $tmp: $!\n"; return; }
+			if (!open(TMP, ">$tmp")) {warn "can't open $tmp: $!\n"; return;}
 			print TMP $text;	close TMP;
 			system (($ENV{PAGER} || $default_pager) . " \'$tmp\'");
 			unlink $tmp;
@@ -796,7 +836,7 @@ sub fmt { my $text = shift; my %options = @_;
 	@i_lines = split (/\r?\n/, $text);
 	foreach $i_line (@i_lines) {
 		if ($i_line =~ /^\s*$/) {   # blank line ?
-			if ($o_line) { push @o_lines, $o_line; $o_line=''; $o_length=0; }
+			if ($o_line) { push @o_lines, $o_line; $o_line=q{}; $o_length=0; }
 			if (! $last_line_empty) { push @o_lines,""; $last_line_empty=1; }
 			next;
 		}
@@ -810,7 +850,7 @@ sub fmt { my $text = shift; my %options = @_;
 			if ($o_line) { push @o_lines, $o_line; }
 			$o_line = $initial_space; $o_length = length $initial_space;
 		} else {
-			$initial_space = '';
+			$initial_space = q{};
 		}
 
 		@i_words = split (' ', $i_line);
@@ -890,7 +930,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.36,
+This is Term::Clui.pm version 1.37,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
@@ -1060,7 +1100,8 @@ as it handles DBM's problem with concurrent accesses.
 =head1 DEPENDENCIES
 
 It requires Exporter, which is core Perl.
-It uses Term::Size if it's available;
+It uses Term::ReadKey if it's available;
+and uses Term::Size if it's available;
 if not, it tries I<tput> before guessing 80x24.
 
 =head1 ENVIRONMENT
@@ -1120,7 +1161,7 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 =head1 SEE ALSO
 
-Term::Clui::FileSelect ,
+Term::Clui::FileSelect , Term::ReadKey , Term::Size ,
 http://www.pjb.com.au/ , perl(1), http://www.cpan.org/SITES.html
 
 =cut
