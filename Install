@@ -25,7 +25,7 @@ again, it's optional, but it should improve portability.
 EOT
 
 my $libdir; my $man1dir; my $man3dir; my $comment; my $perlbin;
-my $version = '1.37';
+my $version = '1.39';
 ($libdir, $man1dir, $man3dir) = &defaults();
 
 if (! -t STDIN) {  # not interactive, use defaults ...
@@ -237,15 +237,15 @@ sub check_kit {
 	print STDERR "Checking your kit ... ";
 
 	my %file_sizes = (
-		'README', 2819,
-		'Changes', 2282,
+		'README', 2775,
+		'Changes', 2380,
 		'MANIFEST', 172,
-		'Clui.pm', 38204,
+		'Clui.pm', 38153,
 		'Clui/FileSelect.pm', 9929,
 		'examples/audio_stuff', 18511,
-		'examples/linux_admin', 13466,
+		'examples/linux_admin', 14672,
 		'examples/login_shell', 5283,
-		'examples/test_script', 7513,
+		'examples/test_script', 7499,
 	);
 
 	my $problem_found = 0;

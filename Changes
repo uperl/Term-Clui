@@ -33,3 +33,5 @@
 20050928 1.35 FileSelect.pm returns correct var-type if q for quit
 20060816 1.36 neater pod SYNOPSIS formatting, audio_stuff uses mpg123 for mp3
 20061005 1.37 uses Term::ReadKey if available, rather than `stty`
+20070309 1.38 choose with a long list asking for a clue offers ^X to quit
+20070309 1.39 no change

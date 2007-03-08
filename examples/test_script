@@ -6,7 +6,6 @@
 #     This script is free software; you can redistribute it and/or      #
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
-use warnings;
 eval "require './Term/Clui.pm'";
 if ($@) { eval "require '../Clui.pm'"; }
 if ($@) { eval "require 'Clui.pm'"; }

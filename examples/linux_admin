@@ -21,30 +21,36 @@ my $squidconfd = &first_existing('/usr/local/squid/etc','/etc/squid');
 my $squid = &first_existing('/usr/local/squid/sbin/squid','/usr/sbin/squid');
 my $sambalogd  = &first_existing('/usr/local/samba/var','/var/log/samba');
 my $sambaconfd = &first_existing('/usr/local/samba/lib','/etc/samba');
+my $tracd = &first_existing('/var/www/trac');
+my $svnd = &first_existing('/usr/local/svn');
 my $apacheconfd = &first_existing( '/usr/local/apache/conf',
  '/usr/local/apache2/conf','/etc/apache2','/etc/apache');
+my $dirvishconf = &first_existing('/etc/dirvish.conf',
+ '/usr/local/dirvish/etc/master.conf','/etc/dirvish/master.conf');
 @tasks = &tasks();
 if (! @tasks) { die "Sorry, no administration tasks are available\n"; }
 while () {
-   $task = &choose ("Administrating $hostname", @tasks);
+   $task = &choose("Administrating $hostname", @tasks);
    if (! $task) { exit;
    } elsif ($task eq "Become superuser") { exec "su - -c $0";
-   } elsif ($task eq "chpass")      { system "chpass";
-   } elsif ($task eq "vipw")        { system "vipw";
-   } elsif ($task eq "visudo")      { system "visudo";
-   } elsif ($task eq "base-config") { system "base-config";
-   } elsif ($task eq "aptitude")    { system "aptitude";
-   } elsif ($task eq "mii-tool")    { system "mii-tool";
-   } elsif ($task eq "adduser")     { &adduser();
-   } elsif ($task eq "chkconfig")   { &chkconfig();
-   } elsif ($task eq "update-rc.d") { &update_rcd();
-   } elsif ($task eq "crontab")     { &crontab();
-   } elsif ($task eq "Network ports") { &ports();
+   } elsif ($task eq "adduser")       { &adduser();
+   } elsif ($task eq "aptitude")      { system "aptitude";
+   } elsif ($task eq "base-config")   { system "base-config";
+   } elsif ($task eq "chpass")        { system "chpass";
+   } elsif ($task eq "chkconfig")     { &chkconfig();
+   } elsif ($task eq "mii-tool")      { system "mii-tool";
    } elsif ($task eq "system-config") { &system_config();
-   } elsif ($task eq "Daemons")     { &daemons();
-   } elsif ($task eq "Squid")       { &squid();
-   } elsif ($task eq "Samba")       { &samba();
-   } elsif ($task eq "Apache")      { &apache();
+   } elsif ($task eq "trac-admin")    { &trac_admin();
+   } elsif ($task eq "update-rc.d")   { &update_rcd();
+   } elsif ($task eq "vipw")          { system "vipw"; system "vipw -s";
+   } elsif ($task eq "visudo")        { system "visudo";
+   } elsif ($task eq "Apache")        { &apache();
+   } elsif ($task eq "Crontab")       { &crontab();
+   } elsif ($task eq "Daemons")       { &daemons();
+   } elsif ($task eq "Dirvish")       { &dirvish();
+   } elsif ($task eq "Network ports") { &ports();
+   } elsif ($task eq "Samba")         { &samba();
+   } elsif ($task eq "Squid")         { &squid();
    } elsif (-f $task) { &edit ($task);
    } elsif (-d $task) {
 		$file = &select_file(-TextFile=>1, -TopDir=>$task);
@@ -56,35 +62,35 @@ sub tasks {
 	if (! $>) {   # root stuff
    	foreach $f (
 			qw(adduser aptitude base-config chkconfig chpass mii-tool
-			sax sax2 update-rc.d vipw visudo yast yast2)) {
+			sax sax2 trac-admin update-rc.d vipw visudo yast yast2)) {
 			if (&which($f)) { push @tasks, $f; }
 		}
 		if (opendir D, '/usr/bin') {
-			@system_configs = sort grep /^system-config-/, readdir D; closedir D;
+			@system_configs = sort grep /^system-config-/,readdir D; closedir D;
 			if (@system_configs) { push @tasks, 'system-config'; }
 			foreach (@system_configs) { s/^system-config-//; }
 		}
 	} else { push @tasks, 'Become superuser';
 	}
-	if (-d $crond) { push @tasks, 'crontab'; }
 	foreach (
 		'/etc/inittab',
 		'/etc/sysconfig',
 		'/etc/xinetd.d',
 		'/etc/resolv.conf',
-		'/etc/group',
 		'/etc/iptables.up.rules',
 		'/etc',
 	) { if (-d $_ || -f $_) { push @tasks, $_; } }
-	if (-d $squidlogd)   { push @tasks, 'Squid'; }
-	if (-d $sambaconfd)  { push @tasks, 'Samba'; }
 	if (-d $apacheconfd) { push @tasks, 'Apache'; }
+	if (-d $crond) { push @tasks, 'Crontab'; }
 	if (! $>) {
 		foreach ('/etc/rc.d/init.d','/etc/init.d') {
 			if (-d $_) {$daemon_d = $_; push @tasks, 'Daemons'; last}
 		}
-	};
+	}
+	if (-e $dirvishconf) { push @tasks, 'Dirvish'; }
 	push @tasks, 'Network ports';
+	if (-d $squidlogd)   { push @tasks, 'Squid'; }
+	if (-d $sambaconfd)  { push @tasks, 'Samba'; }
 	return @tasks;
 }
 sub squid {
@@ -204,6 +210,51 @@ sub apache {
 	 || '/usr/local/apache/bin/apachectl';
 	if (&confirm ('OK to Restart Apache ?')) { system "$apachectl restart"; }
 }
+sub dirvish {
+	if (!open(F,$dirvishconf)) { die "can't open $dirvishconf: $!\n"; }
+	my $ary; my $Banks; my @Vaults;
+	while (<F>) {
+    	if (/^#/)        { next;
+    	} elsif (/^bank:/i)   { $ary = \@Banks;
+    	} elsif (/^Runall:/i) { $ary = \@Vaults;
+    	} elsif (/^\w/)       { $ary = 0;
+    	} elsif (/^\s+(\S+)/ && ref $ary) { push @$ary, $1;
+    	}
+	}
+	close F;
+	my @tasks = ();
+	push @tasks, $dirvishconf;
+	foreach my $vault (sort @Vaults) {
+    	my $bank;
+    	foreach (@Banks) { if (-d "$_/$vault") { $bank = $_; last; } }
+    	if (!$bank) { warn "can't find vault $vault in banks @Banks\n"; next;}
+	
+    	my $backupd  = "$bank/$vault";
+    	$BackupDirs{$vault} = $backupd;
+    	if (!-d "$backupd/dirvish") {warn "$backupd/dirvish not found\n";next;}
+		if (!-f "$backupd/dirvish/default.conf") {
+			open (F, ">$backupd/dirvish/default.conf"); close F;
+		}
+		push @tasks, "$backupd/dirvish/default.conf";
+	}
+	if (@Vaults) {
+		push @tasks, "Re-run last night's backup";
+	}
+	if (1 < @Vaults) {
+		push @tasks, "Re-run a particular vault";
+	}
+
+	my $task = &choose('which dirvish task ?', @tasks);
+	if ($task eq "Re-run last night's backup") {
+		system "dirvish-runall";
+	} elsif ($task eq "Re-run a particular vault") {
+		my $vault = &choose('which vault ?', sort @Vaults);
+		next unless $vault;
+		system "dirvish --vault $vault --image-time 21:00 &";
+	} elsif (-f $task) {
+		&edit($task);
+	}
+}
 sub ports {
 	if (! open (P, "netstat -a |")) {
 		&sorry("can't run netstat -a: $!"); return 0;
@@ -223,7 +274,7 @@ sub daemons {
 sub crontab {
 	if ($>) { system "crontab -e"; return 0; }
 	if (! opendir(D,$crond)) { warn "can't opendir $crond: \n"; return 0; }
-	my @users = grep { !/^\./ } readdir(D);
+	my @users = sort grep { !/^\./ } readdir(D);
 	closedir D;
 	if (! @users) { warn "no crontabs found in $crond\n"; return 0; }
 	my $task = &choose('crontab task ?', 'View', 'Edit', 'Manual');
@@ -272,6 +323,16 @@ sub chkconfig {
 		&view('chkconfig --list', join("\n", (sort @l ),@xinetdl));
 	}
 	&view ('Daemon configuration', $s);
+}
+sub trac_admin {
+	if (! opendir(D, $tracd)) { warn "can't opendir $tracd: $!\n"; return; }
+	@dirs = grep { !/^\./ && -d "$tracd/$_" } readdir(D);
+	closedir D;
+	if (! @dirs) { warn "no projects found in $tracd\n"; return; }
+	my $dir = &choose("which project ?", @dirs);
+	return unless $dir;
+	system "trac-admin $tracd/$dir";
+	if ($svnd && -f "$svnd/conf/svnpolicy") { &edit("$svnd/conf/svnpolicy"); }
 }
 sub update_rcd {
 	my $r = `who -r`; $r =~ s/^\s*(\S+\s+\d+).*$/$1/; warn("currently $r");
@@ -349,63 +410,6 @@ sub first_existing {
 	my $f = ''; foreach (@_) { if (-e $_) { $f = $_; last; } }
 	return $f;
 }
-sub which { my $f; foreach $d (@PATH) { $f="$d/$_[$[]";  return $f if -x $f; } }
-=pod
-
-=head1 NAME
-
-linux_admin - wrapper script for routine sysadmin of linux boxes
-
-=head1 SYNOPSIS
-
-# linux_admin
-
-=head1 DESCRIPTION
-
-This script, which comes along with the I<Term::Clui> Perl-module in its
-I<examples> directory,
-performs routine system administration
-of linux boxes, particularly Fedora and Debian.
-It integrates various programs such as
-crontab, chkconfig, update-rc.d, visudo, vipw, starting and stopping
-daemons, reconfiguring squid samba or apache, editing sysconfig or
-running any of the system-config-* utilities, and much else.
-
-=head1 AUTHOR
-
-Peter J Billam  www.pjb.com.au/comp/contact.html
-
-=head1 CREDITS
-
-Based on Term::Clui
-
-=head1 SEE ALSO
-
-http://www.pjb.com.au/ ,
-http://search.cpan.org/~pjb , 
-Term::Clui,
-a2enmod(1),
-a2ensite(1),
-a2dismod(1),
-a2dissite(1),
-adduser(1)
-apache(1)
-apache2ctl(1),
-aptitude(1),
-base-config(1),
-chkconfig(1),
-chpass(1),
-crontab(1),
-mii-tool(1),
-samba(1),
-sax(1),
-sax2(1),
-squid(1),
-update-rc.d(1),
-vipw(1),
-visudo(1),
-yast(1),
-yast2(1),
-
-=cut
-
+sub which { my $f;
+	foreach $d (@PATH) { $f="$d/$_[$[]";  return $f if -x $f; }
+}

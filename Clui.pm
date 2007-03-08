@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.37';
+$VERSION = '1.39';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -256,7 +256,7 @@ sub ask { my ($question, $default) = @_;
 			  	&clrtoeol(); &left($n-$i);
 			}
 		} elsif ($c eq "\cC" || $c eq "\cX" || $c eq "\cD") {  # clear ...
-			&left($i); $i = 0; $n = 0; @s = (); &clrtoeol();
+			&left($i); $i = 0; $n = 0; &clrtoeol(); @s = ();
 		} elsif ($c eq "\cB") { &left($i); $i = 0;
 		} elsif ($c eq "\cE") { &right($n-$i); $i = $n;
 		} elsif ($c eq "\cL") {  # redraw ...
@@ -321,6 +321,7 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 	}
 	if ($nrows >= $maxrows) {
 		@list = &narrow_the_search(@list);
+&puts("returned\n");
 		if (! @list) {
 			&up(1); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
 			return wantarray ? () : undef;
@@ -529,9 +530,8 @@ sub narrow_the_search { my @biglist = @_;
 			  	foreach $j ($i..$n) { &puts($s[$j]); }
 				&clrtoeol(); &left($n-$i);
 			}
-		# but these should do the "q for quit" job XXX
 		} elsif ($c eq "\cC" || $c eq "\cX" || $c eq "\cD") {  # clear ...
-			if (! @s) {
+			if (! @s) {   # 20070305 ?
 				$clue_has_been_given = 0; &erase_lines(1); return ();
 			}
 			&left($i); $i = 0; $n = 0; @s = (); &clrtoeol();
@@ -559,18 +559,17 @@ sub narrow_the_search { my @biglist = @_;
 	warn "narrow_the_search: shouldn't reach here ...\n";
 }
 sub ask_for_clue { my ($nchoices, $i, $s) = @_;
-	my $headstr; my $tailstr;
 	if ($nchoices) {
 		if ($s) {
-			$headstr = "the choices won't fit; there are still";
-			$tailstr = "of them";
-			&goto(0,1); &puts("$headstr $nchoices $tailstr"); &clrtoeol();
+			my $headstr = "the choices won't fit; there are still";
+			&goto(0,1); &puts("$headstr $nchoices of them"); &clrtoeol();
 			&goto(0,2); &puts("lengthen the clue : "); &right($i);
 		} else {
-			$headstr = "the choices won't fit; there are";
-			$tailstr = "of them";
-			&goto(0,1); &puts("$headstr $nchoices $tailstr"); &clrtoeol();
-			&goto(0,2); &puts("   give me a clue : "); &right($i);
+			my $headstr = "the choices won't fit; there are";
+			&goto(0,1); &puts("$headstr $nchoices of them"); &clrtoeol();
+			&goto(0,2);
+			&puts("   give me a clue :            (or ctrl-X to quit)");
+			&left(30);
 		}
 	} else {
 		&goto(0,1); &puts("No choices fit this clue !"); &clrtoeol();
@@ -930,7 +929,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.37,
+This is Term::Clui.pm version 1.39,
 #COMMENT#.
 
 =head1 WINDOW-SIZE

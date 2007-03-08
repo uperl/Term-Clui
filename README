@@ -12,10 +12,10 @@ Also included is the file-selector module Term::Clui::FileSelect,
 with its main subroutine &select_file.  Term::Clui doesn't yet work
 yet under Windows.
 
-To install ( cool ! new ! interactive ! ) just:
+To install just:
    perl Install
 
-that's all ! or you can still do it the usual way ...
+or you can still do it the usual way ...
    perl Makefile.PL
    make
    make install

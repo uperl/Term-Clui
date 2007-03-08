@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.37';
+$VERSION = '1.39';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
@@ -182,7 +182,7 @@ when I<file_select> is invoked in a list context, with -Chdir=>0
 and without -Create.  It is currently not possible
 to select multiple files lying in different directories.
 
-This is Term::Clui::FileSelect.pm version 1.37,
+This is Term::Clui::FileSelect.pm version 1.39,
 #COMMENT#.
 
 =head1 SUBROUTINES
