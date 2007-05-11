@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.39';
+$VERSION = '1.40';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -321,7 +321,6 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 	}
 	if ($nrows >= $maxrows) {
 		@list = &narrow_the_search(@list);
-&puts("returned\n");
 		if (! @list) {
 			&up(1); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
 			return wantarray ? () : undef;
@@ -929,7 +928,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.39,
+This is Term::Clui.pm version 1.40,
 #COMMENT#.
 
 =head1 WINDOW-SIZE
