@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.40';
+$VERSION = '1.41';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -47,7 +47,9 @@ $KEY_BTAB  = 0541;
 my $irow; my $icol;   # maintained by &puts, &up, &down, &left and &right
 sub puts   { my $s = join q{}, @_;
 	$irow += ($s =~ tr/\n/\n/);
-	if ($s =~ /\r$/) { $icol = 0; }   # should increment otherwise ...
+	if ($s =~ /\r\n?$/) { $icol = 0;
+	} else { $icol += length ($s);
+	}
 	print TTY $s;
 }
 # could terminfo sgr0, bold, rev, cub1, cuu1, cuf1, cud1 ...
@@ -130,19 +132,19 @@ sub getch {
 	}
 }
 sub up    {
-	if ($_[$[] < 0) { &down($_[$[]); return; }
+	# if ($_[$[] < 0) { &down(0 - $_[$[]); return; }
 	print TTY "\033[A" x $_[$[]; $irow -= $_[$[];
 }
 sub down  {
-	if ($_[$[] < 0) { &up($_[$[]); return; }
+	# if ($_[$[] < 0) { &up(0 - $_[$[]); return; }
 	print TTY "\n" x $_[$[]; $irow += $_[$[];
 }
 sub right {
-	if ($_[$[] < 0) { &up($_[$[]); return; }
+	# if ($_[$[] < 0) { &left(0 - $_[$[]); return; }
 	print TTY "\033[C" x $_[$[]; $icol += $_[$[];
 }
 sub left  {
-	if ($_[$[] < 0) { &up($_[$[]); return; }
+	# if ($_[$[] < 0) { &right(0 - $_[$[]); return; }
 	print TTY "\033[D" x $_[$[]; $icol -= $_[$[];
 }
 sub goto { my $newcol = shift; my $newrow = shift;
@@ -154,7 +156,7 @@ sub goto { my $newcol = shift; my $newrow = shift;
 	} elsif ($newrow < $irow) { &up   ($irow-$newrow);
 	}
 }
-sub move { my ($ix,$iy) = @_; printf TTY "\033[%d;%dH",$iy+1,$ix+1; }
+# sub move { my ($ix,$iy) = @_; printf TTY "\033[%d;%dH",$iy+1,$ix+1; }
 
 my $initscr_already_run = 0; my $stty = q{};
 
@@ -289,13 +291,12 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 	# As from 1.22, allows multiple choice if called in array context
 
 	return unless @list;
-	grep (($_ =~ s/\n$//) && 0, @list);	# chop final \n if any
+	grep (($_ =~ s/[\r\n]+$//) && 0, @list);	# chop final newlines
 	my @biglist = @list; my $icell; @marked = ();
 
 	$question =~ s/^[\n\r]+//;   # strip initial newline(s)
 	$question =~ s/[\n\r]+$//;   # strip final newline(s)
-	my $firstline;
-	($firstline,$otherlines) = split ("\n", $question, 2);
+	my ($firstline,$otherlines) = split (/\r?\n/, $question, 2);
 	my $firstlinelength = length $firstline;
 
 	$choice = &get_default($firstline);
@@ -308,16 +309,16 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 	if (wantarray) {
 		$#marked = $#list;
 		if ($firstlinelength < $maxcols-30) {
-			&puts("$firstline (multiple choice with spacebar)\r\n");
+			&puts("$firstline (multiple choice with spacebar)\n\r");
 		} elsif ($firstlinelength < $maxcols-16) {
-			&puts("$firstline (multiple choice)\r\n");
+			&puts("$firstline (multiple choice)\n\r");
 		} elsif ($firstlinelength < $maxcols-9) {
-			&puts("$firstline (multiple)\r\n");
+			&puts("$firstline (multiple)\n\r");
 		} else {
-			&puts("$firstline\r\n");
+			&puts("$firstline\n\r");
 		}
 	} else {
-		&puts("$firstline\r\n");
+		&puts("$firstline\n\r");
 	}
 	if ($nrows >= $maxrows) {
 		@list = &narrow_the_search(@list);
@@ -371,13 +372,13 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 			$this_cell--; &wr_cell($this_cell+1);
 			&wr_cell($this_cell); 
 		} elsif ((($c eq "j") || ($c == $KEY_DOWN)) && ($irow < $nrows)) {
-			$mid_col = $icol[$this_cell] + 0.5 * $l[$this_cell];
+			$mid_col = $icol[$this_cell] + 0.5 * length($list[$this_cell]);
 			$left_of_target = 1000;
 			for ($inew=$this_cell+1; $inew < $#list; $inew++) {
 				last if $icol[$inew] < $mid_col;	# skip rest of row
 			}
 			for (; $inew < $#list; $inew++) {
-				$new_mid_col = $icol[$inew] + 0.5 * $l[$inew];
+				$new_mid_col = $icol[$inew] + 0.5*length($list[$inew]);
 				last if $new_mid_col >= $mid_col;		# we've reached it
 				last if $icol[$inew+1] <= $icol[$inew]; # we're at EOL
 				$left_of_target = $mid_col - $new_mid_col;
@@ -386,14 +387,14 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 			$iold = $this_cell; $this_cell = $inew;
 			&wr_cell($iold); &wr_cell($this_cell);
 		} elsif ((($c eq "k") || ($c == $KEY_UP)) && ($irow > 1)) {
-			$mid_col = $icol[$this_cell] + 0.5 * $l[$this_cell];
+			$mid_col = $icol[$this_cell] + 0.5*length($list[$this_cell]);
 			$right_of_target = 1000;
 			for ($inew=$this_cell-1; $inew > 0; $inew--) {
 				last if $irow[$inew] < $irow[$this_cell];	# skip rest of row
 			}
 			for (; $inew > 0; $inew--) {
 				last unless $icol[$inew];
-				$new_mid_col = $icol[$inew] + 0.5 * $l[$inew];
+				$new_mid_col = $icol[$inew] + 0.5*length($list[$inew]);
 				last if $new_mid_col < $mid_col;		 # we're past it
 				$right_of_target = $new_mid_col - $mid_col;
 			}
@@ -479,7 +480,8 @@ sub layout { my @list = @_;
 sub wr_screen {
 	my $i;
 	for ($i=$[; $i<=$#list; $i++) {
-		&wr_cell($i, $this_cell) unless $i==$this_cell;
+		# &wr_cell($i, $this_cell) unless $i==$this_cell;
+		&wr_cell($i) unless $i==$this_cell;
 	}
 	if ($notherlines && ($nrows+$notherlines) < $maxrows) {
 		&puts("\r\n", join("\r\n", @otherlines), "\r");
@@ -495,11 +497,9 @@ sub wr_cell { my $i = shift;
 	$no_tabs =~ s/^(.{1,77}).*/$1/;
 	&puts(" $no_tabs ");
 	if ($marked[$i] || $i == $this_cell) { &attrset($A_NORMAL); }
-	$icol += length ($no_tabs) + 2;
 }
 sub size_and_layout {
 	my $erase_rows = shift;
-	my $oldmaxrows = $maxrows;
 	&check_size();
 	if ($erase_rows) {
 		if ($erase_rows > $maxrows) { $erase_rows = $maxrows; } # XXX?
@@ -825,7 +825,7 @@ sub display_question {   my $question = shift; my %options = @_;
 	return scalar @otherlines;
 }
 sub erase_lines {  # leaves cursor at beginning of line $_[$[]
-	&goto(0, $_[$[]); &puts("\e[J");
+	&goto(0, $_[$[]); print TTY "\e[J";
 }
 sub fmt { my $text = shift; my %options = @_;
 	# Used by tiview, ask and confirm; formats the text within $maxcols cols
@@ -928,8 +928,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.40,
-#COMMENT#.
+This is Term::Clui.pm version 1.41
 
 =head1 WINDOW-SIZE
 

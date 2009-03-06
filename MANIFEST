@@ -1,5 +1,4 @@
 Changes
-Install
 Clui.pm
 Clui/FileSelect.pm
 Makefile.PL
@@ -11,3 +10,5 @@ examples/login_shell
 examples/test_script
 examples/linux_admin
 examples/audio_stuff
+py/TermClui.py
+py/test_script

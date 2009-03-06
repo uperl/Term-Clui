@@ -11,7 +11,7 @@
 #  $ENV{CDDA_DEVICE} cdrecord -scanbus
 # ATAPI: cdcontrol -f /dev/cd0c info, burncd, mkisofs
 #  $ENV{CDROM}  /usr/sbin/pciconf -lv, atacontrol list
-# MIDI: timidity lame
+# MIDI: timidity, lame or toolame or twolame
 #   
 #  timidity -Ow -o sample.wav sample.mid
 #  normalize -m *.wav
@@ -32,75 +32,104 @@
 #  sndfile-play whatever.mpg  or
 #  mpg123 whatever.mpg
 
-while ($ARGV[$[] =~ /^-([a-z])/) {
-   if ($1 eq 'e')      { &whatever; shift;
-   } elsif ($1 eq 'c') { &whatever; shift;
-   } else { print <<EOT; exit 0;
-usage:
-   whatever file      # does what
-EOT
-	}
-}
 use Cwd qw(chdir);
 use Term::Clui;
 use Term::Clui::FileSelect;
 my @PATH = split (":",$ENV{PATH});
-my $timidity     = &which('timidity');
-my $lame         = &which('lame');
-my $cdrecord     = &which('cdrecord');
-my $cdda2wav     = &which('cdda2wav');
-my $sndfile_play = &which('sndfile-play');
-my $mpg123       = &which('mpg123');
-my $aplaymidi    = &which('aplaymidi');
-my $arecordmidi  = &which('arecordmidi');
-my $normalize    = &which('normalize');
-my $mkisofs      = &which('mkisofs');
-my $man          = &which('man');
-my $su           = &which('su');
+my $MidiOutPort  = ();
+
+my $aconnect     = which('aconnect');
+my $alsamixer    = which('alsamixer');
+my $aplaymidi    = which('aplaymidi');
+my $arecordmidi  = which('arecordmidi');
+my $cdda2wav     = which('icedax') || which('cdda2wav');
+my $cdrecord     = which('cdrecord') || which('wodim');
+my $eject        = which('eject');
+my $lame         = which('lame');
+my $toolame      = which('toolame') || which('twolame');
+my $man          = which('man');
+my $mkisofs      = which('mkisofs');
+my $mpg123       = which('mpg123');
+my $mplayer      = which('mplayer');
+my $normalize    = which('normalize') || which ('normalize-audio');
+my $sndfile_play = which('sndfile-play');
+my $su           = which('su');
+my $timidity     = which('timidity');
 
 while (1) {
-	my $task = &choose('Do what ?', &tasks());
+	my $task = choose('Do what ?', tasks());
 	exit unless $task;
 	if ($task eq 'Extract and Burn') {
 		warn "You'll need to be superuser ...\n";
-		system "/usr/bin/su root -c $0"; exit 0;
-	} elsif ($task eq 'burn WAV->AudioCD')  { &burn_wav();
-	} elsif ($task eq 'burn MP3->MP3CD')    { &burn_mp3();
-	} elsif ($task eq 'rip AudioCD->WAV')   { &rip_wav();
-	} elsif ($task eq 'rip MP3CD->MP3')     { &rip_mp3();
-	} elsif ($task eq 'encode WAV->MP3')    { &wav2mp3();
-	} elsif ($task eq 'decode MP3->WAV')    { &mp32wav();
-	} elsif ($task eq 'convert MIDI->WAV')  { &mid2wav();
-	} elsif ($task eq 'convert MIDI->MP3')  { &mid2mp3();
-	} elsif ($task eq 'play MIDI,WAV,MP3')  { &play();
-	} elsif ($task eq 'record Keyboard->MIDI') { &kbd2mid();
-	} elsif ($task eq 'change Directory')   { &changedir();
-	} elsif ($task eq 'edit Makefile')      { &edit('Makefile');
+		system "$su root -c $0"; exit 0;
+	} elsif ($task eq 'burn WAV->AudioCD')  { burn_wav();
+	} elsif ($task eq 'burn MP3->MP3CD')    { burn_mp3();
+	} elsif ($task eq 'change Directory')   { changedir();
+	} elsif ($task eq 'configure Timidity') { configure_timidity();
+	} elsif ($task eq 'connect MIDIports')  { connect_midi_ports();
+	} elsif ($task eq 'consult Manual')     { man();
+	} elsif ($task eq 'convert MIDI->WAV')  { mid2wav();
+	} elsif ($task eq 'convert MIDI->MP3')  { mid2mp3();
+	} elsif ($task eq 'copy audio CD')      { copy_cd();
+	} elsif ($task eq 'decode MP3->WAV')    { mp32wav();
+	} elsif ($task eq 'edit Makefile')      { edit('Makefile');
+	} elsif ($task eq 'encode WAV->MP2')    { wav2mp2();
+	} elsif ($task eq 'encode WAV->MP3')    { wav2mp3();
+	} elsif ($task eq 'list Soundfont')     { list_soundfont();
+	} elsif ($task eq 'play MIDI,WAV,MP3')  { play();
+	} elsif ($task eq 'record Keyboard->MIDI') { kbd2mid();
+	} elsif ($task eq 'rip AudioCD->WAV')   { rip_wav();
+	} elsif ($task eq 'rip MP3CD->MP3')     { rip_mp3();
+	} elsif ($task eq 'run alsamixer')      { alsamixer();
 	} elsif ($task eq 'run Make')           { system 'make';
-	} elsif ($task eq 'list Soundfont')     { &list_soundfont();
-	} elsif ($task eq 'consult Manual')     { &man();
-	} elsif ($task eq 'configure Timidity') { &configure_timidity();
 	}
 }
 exit 0;
 
 #----------------------- functionality ------------------------
+sub alsamixer {
+	if (! $alsamixer) { sorry("you need to install alsamixer."); return; }
+	system $alsamixer;
+}
 sub burn_wav {
-	if (! $cdrecord) { &sorry("you need to install cdrecord."); return; }
-	&set_cdda_device() || return;
-	my @files = &select_file(-FPat=>'{*.wav,*.WAV}',-Path=>$ENV{PWD},-Chdir=>0);
+	if (!$cdrecord) {sorry("you need to install cdrecord or wodim."); return;}
+	set_cdda_device() || return;
+	my @files = select_file(-FPat=>'{*.wav,*.WAV}',-Path=>$ENV{PWD},-Chdir=>0);
 	return unless @files;
 	my $files = join "' '", @files;
 	system "$cdrecord dev=0,0 -v -dao -pad -speed=12 -copy '$files'";
 }
 sub burn_mp3 {
-	if (! $mkisofs)  { &sorry("you need to install mkisofs.");  return; }
-	if (! $cdrecord) { &sorry("you need to install cdrecord."); return; }
+	if (! $mkisofs)  { sorry("you need to install mkisofs.");  return; }
+	if (!$cdrecord) {sorry("you need to install cdrecord or wodim."); return;}
+}
+sub copy_cd {
+	my $ok = 1;
+	if (!$cdda2wav) {sorry("you need to install cdda2wav or icedax."); $ok=0;}
+	if (!$cdrecord) {sorry("you need to install cdrecord or wodim.");  $ok=0;}
+	if (! -e '/dev/cdrom') { sorry("can't find /dev/cdrom"); $ok = 0;
+	} elsif (! -w '/dev/cdrom') { sorry("can't write to /dev/cdrom"); $ok=0; }
+	return unless $ok;
+	my $tmpdir = "/tmp/audio_stuff_$$";
+	if (! mkdir $tmpdir) { sorry("can't mkdir $tmpdir: $!"); return; }
+	my $olddir = 'pwd';
+	if (! chdir $tmpdir) { sorry("can't chdir $tmpdir: $!"); return; }
+	if ($eject) { system $eject; }
+	system "$cdda2wav dev=/dev/cdrom -vall cddb=0 -B -Owav";
+	if ($eject) { system $eject; }
+	while (1) {
+		ask("insert blank CD into drive and press Return...");
+		system "$cdrecord dev=/dev/cdrom -v -dao -useinfo -text  *.wav";
+		if ($eject) { system $eject; }
+		last unless confirm "do you want to write that to another CD ?";
+	}
+	chdir "$oldir";
+	system "rm -rf $tmpdir";
 }
 sub rip_wav {
-	if (! $cdda2wav) { &sorry("you need to install cdda2wav."); return; }
-	&set_cdda_device() || return;
-	my $task = &choose('Extract', 'All tracks', 'Just one track');
+	if (!$cdda2wav) {sorry("you need to install cdda2wav or icedax."); return;}
+	set_cdda_device() || return;
+	my $task = choose('Extract', 'All tracks', 'Just one track');
 	return unless $task;
 	if ($task eq 'All tracks') {
 		system "$cdda2wav cddb=0 -H -B -Owav"; return;
@@ -126,7 +155,7 @@ sub rip_wav {
 	}
 	print join("\n", @header), "\n";
 
-	$track = &choose('Extract which track ?', @tracks);
+	$track = choose('Extract which track ?', @tracks);
 	$track =~ s/^\s*T0?//;
 	$track =~ s/:?\s+.*$//;
 
@@ -135,77 +164,90 @@ sub rip_wav {
 sub rip_mp3 {
 }
 sub wav2mp3 {
-	if (! $lame) { &sorry("you need to install lame."); return; }
-	my @files = &select_file(-FPat=>'*.wav', -Path=>$ENV{PWD}, -Chdir=>0);
+	if (! $lame) { sorry("you need to install lame."); return; }
+	my @files = select_file(-FPat=>'*.wav', -Path=>$ENV{PWD}, -Chdir=>0);
 	foreach my $i (@files) {
 		my $o = $i; $o =~ s/wav$/mp3/;
-		if (-f $o && !&confirm("OK to overwrite $o ?")) { next; }
+		if (-f $o && !confirm("OK to overwrite $o ?")) { next; }
 		system "$lame -h $i $o";
 	}
 }
+sub wav2mp2 {
+	if (! $toolame) { sorry("you need to install toolame."); return; }
+	my @files = select_file(-FPat=>'*.wav', -Path=>$ENV{PWD}, -Chdir=>0);
+	foreach my $i (@files) {
+		my $o = $i; $o =~ s/wav$/mp2/;
+		if (-f $o && !confirm("OK to overwrite $o ?")) { next; }
+		system "$toolame $i";
+	}
+}
 sub mp32wav {
-	if (! $lame)      { &sorry("you need to install lame.");      return; }
-	if (! $normalize) { &sorry("you need to install normalize."); return; }
-	my @files = &select_file(-FPat=>'*.mp3', -Path=>$ENV{PWD}, -Chdir=>0);
+	if (! $lame)      { sorry("you need to install lame.");      return; }
+	if (! $normalize) { sorry("you need to install normalize."); return; }
+	my @files = select_file(-FPat=>'*.mp3', -Path=>$ENV{PWD}, -Chdir=>0);
 	foreach my $i (@files) {
 		my $o = $i; $o =~ s/mp3$/wav/;
-		if (-f $o && !&confirm("OK to overwrite $o ?")) { next; }
+		if (-f $o && !confirm("OK to overwrite $o ?")) { next; }
 		system "$lame --mp3input --decode $i $o";
 		system "$normalize --peak $o";
 	}
 }
 sub mid2wav {
-	if (! $timidity)  { &sorry("you need to install timidity.");  return; }
-	if (! $normalize) { &sorry("you need to install normalize."); return; }
-	my @files = &select_file(-FPat=>'*.mid', -Path=>$ENV{PWD}, -Chdir=>0);
-	my $config = &timiditycfg();
-	if (! $config) { &sorry("can't find any timidity.cfg file"); return; }
+	if (! $timidity)  { sorry("you need to install timidity.");  return; }
+	if (! $normalize) { sorry("you need to install normalize."); return; }
+	my @files = select_file(-FPat=>'*.mid', -Path=>$ENV{PWD}, -Chdir=>0);
+	my $config = timiditycfg();
+	if (! $config) { sorry("can't find any timidity.cfg file"); return; }
 	my @wavs = ();
 	foreach my $i (@files) {
 		my $o = $i; $o =~ s/mid$/wav/; push @wavs, $o;
-		if (-f $o && !&confirm("OK to overwrite $o ?")) { next; }
+		if (-f $o && !confirm("OK to overwrite $o ?")) { next; }
 		system "$timidity -Ow -c $config -o $o $i";
 	}
 	system "$normalize --batch --peak '".join("' '",@wavs), "'";
 }
 sub mid2mp3 {
-	if (! $timidity)  { &sorry("you need to install timidity.");  return; }
-	if (! $normalize) { &sorry("you need to install normalize."); return; }
-	if (! $lame)      { &sorry("you need to install lame.");      return; }
-	my @files = &select_file(-FPat=>'*.mid', -Path=>$ENV{PWD}, -Chdir=>0);
+	if (! $timidity)  { sorry("you need to install timidity.");  return; }
+	if (! $normalize) {
+		sorry("you need to install normalize or normalize-audio."); return;
+	}
+	if (! $lame)      { sorry("you need to install lame.");      return; }
+	my @files = select_file(-FPat=>'*.mid', -Path=>$ENV{PWD}, -Chdir=>0);
 	my @wavs = ();
 	foreach my $i (@files) {
 		my $o = $i; $o =~ s/mid$/wav/; push @wavs, $o;
-		if (-f $o && !&confirm("OK to overwrite $o ?")) { next; }
+		if (-f $o && !confirm("OK to overwrite $o ?")) { next; }
 		system "$timidity -Ow -o $o $i";
 	}
 	system "$normalize --batch --peak '".join("' '",@wavs), "'";
 	foreach my $o (@wavs) {
 		my $oo = $o; $oo =~ s/wav$/mp3/;
-		if (-f $oo && !&confirm("OK to overwrite $oo ?")) { next; }
+		if (-f $oo && !confirm("OK to overwrite $oo ?")) { next; }
 		system "$lame -h $o $oo";
 		unlink $o;
 	}
 }
 sub play {
-	my $file = &select_file(-Readable=>1, -Path=>$ENV{PWD},
+	my $file = select_file(-Readable=>1, -Path=>$ENV{PWD},
 		-FPat=>'{*.wav,*.mp3,*.mid}');
 	return unless $file;
 	if ($mpg123 && $file =~ /\.mp3$/) {
-		system "$mpg123 $file";
+		inform('s=stop/start  b=beginning  ,=rewind  .=fast-forward  q=quit');
+		system "$mpg123 -C $file"; system "stty sane";
 		return;
 	} elsif ($file =~ /\.wav$|\.mp3$/) {
 		if (! $sndfile_play) {
 			if ($file =~ /\.mp3$/) {
-				&sorry("you need to install mpg123 or sndfile-play."); return;
+				sorry("you need to install mpg123 or sndfile-play."); return;
 			} else {
-				&sorry("you need to install sndfile-play."); return;
+				sorry("you need to install sndfile-play."); return;
 			}
 		}
+		if ($file =~ /\.mp3$/) { warn "no mpg123; using sndfile-play...\n"; }
 		system "$sndfile_play $file";
 		return;
 	}
-	if (! $aplaymidi) { &sorry("you need to install aplaymidi."); return; }
+	if (! $aplaymidi) { sorry("you need to install aplaymidi."); return; }
 	# also needed by metronome below, should factorize this code out ...
 	if (!open(P,"$aplaymidi -l |")) { die "can't run $aplaymidi -l: $!\n"; }
 	my (%outport2device, %device2outport);
@@ -221,65 +263,103 @@ sub play {
 	my @outdevices = sort keys %device2outport;
 	my $outdevices; my $outport;
 	if (!@outdevices) {
-		&sorry("aplaymidi can't see any midi output devices."); return;
+		sorry("aplaymidi can't see any midi output devices."); return;
 	} elsif (1 == @outdevices) {
-		&inform("using midi device $outdevices[$[]");
+		inform("using midi device $outdevices[$[]");
 		$outport = $device2outport{$outdevices[$[]};
 	} else {
-		$outport = $device2outport{&choose('To which device ?',@outdevices)};
+		$outport = $device2outport{choose('To which device ?',@outdevices)};
 		return unless $outport;
 	}
 	system "$aplaymidi -p $outport \"$file\"";
 }
-sub kbd2mid {
-	if (! $arecordmidi) { &sorry("you need to install arecordmidi."); return; }
-	if (!open(P,"$arecordmidi -l |")) { die "can't run $arecordmidi -l: $!\n"; }
+sub midi_in_port {
+	if (! $aconnect) { sorry("you need to install aconnect."); return; }
+	if (!open(P,"$aconnect -i |")) {die "can't run $aconnect -i: $!\n";}
+	my $major; my $inport; my $outport;
 	while (<P>) {
-		if (/^\s*(\d+:\d)\s+(.*)$/) {
-			my $port = $1;
-			my $device = $2; substr ($device,0,32) = ''; $device =~ s/^\s*//;
-			$inport2device{$port} = $device;
-			$device2inport{$device} = $port;
+		if (/^client\s*(\d+:)/) {  $major = $1;
+		} elsif (/^\s+(\d)\s+'(.*)'/) {
+			my $minor = $1; my $device = $2; $device =~ s/\s+$//;
+			$inport2device{"$major$minor"} = $device;
+			$device2inport{$device} = "$major$minor";
 		}
 	}
 	close P;
 	my @indevices = sort keys %device2inport;
-	my $indevices; my $inport;
+	my $indevices;
+	my $inport;
 	if (!@indevices) {
-		&sorry("arecordmidi can't see any midi input devices."); return;
+		sorry("aconnect can't see any midi input devices."); return;
 	} elsif (1 == @indevices) {
-		&inform("using midi device $indevices[$[]");
+		inform("using MIDI-input-port $indevices[$[]");
 		$inport = $device2inport{$indevices[$[]};
 	} else {
-		$inport = $device2inport{&choose('To which device ?',@indevices)};
-		return unless $inport;
+		$inport = $device2inport{choose('From which device ?',@indevices)};
 	}
-	my $bpm = &choose('crochets (quarter-notes) per minute ?', &tempi());
+	return $inport;
+}
+sub midi_out_port {
+	if (! $aconnect) { sorry("you need to install aconnect."); return; }
+	if (!open(P,"$aconnect -o |")) {die "can't run $aconnect -o: $!\n";}
+	while (<P>) {
+		if (/^client\s*(\d+:)/) {  $major = $1;
+		} elsif (/^\s+(\d)\s+'(.*)'/) {
+			my $minor = $1; my $device = $2; $device =~ s/\s+$//;
+			$outport2device{"$major$minor"} = $device;
+			$device2outport{$device} = "$major$minor";
+		}
+	}
+	close P;
+	my @outdevices = sort keys %device2outport;
+	my $outdevices;
+	my $outport;
+	if (!@outdevices) {
+		sorry("aconnect can't see any midi output devices."); return;
+	} elsif (1 == @outdevices) {
+		inform("using MIDI-output-port $outdevices[$[]");
+		$outport = $device2outport{$outdevices[$[]};
+	} else {
+		$outport = $device2outport{choose('To which device ?',@outdevices)};
+	}
+	return $outport;
+}
+sub connect_midi_ports {
+	my $inport  = midi_in_port();
+	return unless $inport;
+	my $outport = midi_out_port();
+	return unless $outport;
+	$MidiOutPort = $outport;
+	system "$aconnect $inport $outport";
+}
+sub kbd2mid {
+	my $inport  = midi_in_port();
+	return unless $inport;
+	my $bpm = choose('crochets (quarter-notes) per minute ?', tempi());
 	$bpm = $bpm || 120;
-	my $timesig = &choose('time signature ?', '3/8','6/8','9/8','12/8',
+	my $timesig = choose('time signature ?', '3/8','6/8','9/8','12/8',
 		'2/4','3/4','4/4','5/4','6/4','7/4','2/2','3/2');
 	$timesig = $timesig || '4/4';
 	$timesig =~ s/\//:/;
-	my $file = &ask("To what midifile ?");
+	my $file = ask("To what midifile ?");
 	return unless $file;
 	if ($file !~ /\.mid$/) { $file .= '.mid'; }
 	my $metronome;
-	if ($outport) { $metronome=&choose('With a metronome ?','Yes','No'); }
-	my $ok = &ask("<Return> to start recording, <Ctrl-C> to stop ...");
+	if ($MidiOutPort) { $metronome=choose('With a metronome ?','Yes','No'); }
+	my $ok = ask("<Return> to start recording, <Ctrl-C> to stop ...");
 	if ($metronome) {
-		system "arecordmidi -p$inport -b$bpm -i$timesig -m$outport $file";
+		system "arecordmidi -p$inport -b$bpm -i$timesig -m$MidiOutPort $file";
 	} else {
 		system "arecordmidi -p$inport -b$bpm -i$timesig $file";
 	}
 }
 sub changedir {
-	# &select_file(-Path=>$ENV{PWD}, -FPat=>'OV*AgwQpJY', -SelDir=>1);
-	my $newdir = &select_file(-Path=>$ENV{PWD}, -Directory=>1);
+	my $newdir = select_file(-Path=>$ENV{PWD}, -Directory=>1);
 	return unless $newdir;
-	if (! -d $newdir) { &sorry("$newdir is not a directory"); return; }
-	if (! chdir $newdir) { &sorry("can't chdir to $newdir: \!"); return; }
+	if (! -d $newdir) { sorry("$newdir is not a directory"); return; }
+	if (! chdir $newdir) { sorry("can't chdir to $newdir: \!"); return; }
 	# assertively rename *.WAV->*.wav, *.MID->*.mid, *.MP3->*.mp3
-	if (! opendir (D, '.')) { &sorry("can't opendir $newdir: \!"); return; }
+	if (! opendir (D, '.')) { sorry("can't opendir $newdir: \!"); return; }
 	my @allfiles = grep { !/^\./ } readdir(D);
 	closedir D;
 	my $oldname;
@@ -295,21 +375,20 @@ sub changedir {
 		my $newname = $oldname; $newname =~ s/MID$/mid/;
 		rename $oldname, $newname;
 	}
-
 }
 
 sub list_soundfont {
 	eval 'require File::Format::RIFF';
-	if ($@) { &sorry("you need to install File::Format::RIFF."); return; }
+	if ($@) { sorry("you need to install File::Format::RIFF."); return; }
 
-	my $config = &timiditycfg();
+	my $config = timiditycfg();
 	my $dir = $ENV{PWD};
 	if (open (F, $config)) {
 		while (<F>) { if (/^dir\s+(.+)$/) { $dir = $1; last; } } close F;
 	} else {
-		&inform("can't find any timidity.cfg file ...");
+		inform("can't find any timidity.cfg file ...");
 	}
-	my $file = &select_file(
+	my $file = select_file(
 		-Title=>'Which Soundfont file ?', -FPat=>'{*.sf2,*.SF2}', -Path=>$dir,
 	);
 	return unless $file;
@@ -334,29 +413,29 @@ sub list_soundfont {
 	}
 	my @t = "$file\nPreset Bank  PresetName";
 	foreach (sort {$a<=>$b} keys %t) { push @t, $t{$_}; }
-	&view("Contents of $file", join("\n", @t)."\n");
+	view("Contents of $file", join("\n", @t)."\n");
 }
 sub configure_timidity {
-	if (! $timidity)  { &sorry("you need to install timidity.");  return; }
-	my $f = &timiditycfg;
+	if (! $timidity)  { sorry("you need to install timidity.");  return; }
+	my $f = timiditycfg();
 	if (! $f) {
-		&inform("can't find any timidity.cfg ...");
+		inform("can't find any timidity.cfg ...");
 	} elsif (-w $f) {
-		&edit($f);
+		edit($f);
 	} else {
-		&inform("you don't have write permission to $f ...");
+		inform("you don't have write permission to $f ...");
 		if (!-w $ENV{PWD}) {
-			&inform("and you don't have write permission here in $ENV{PWD}");
+			inform("and you don't have write permission here in $ENV{PWD}");
 			return;
 		}
-		return unless &confirm("Create a local timidity.cfg in $ENV{PWD} ?");
+		return unless confirm("Create a local timidity.cfg in $ENV{PWD} ?");
 		if (! open (O, ">$ENV{PWD}/timidity.cfg")) {
-			&sorry("can't write to $ENV{PWD}/timidity.cfg: $!"); return;
+			sorry("can't write to $ENV{PWD}/timidity.cfg: $!"); return;
 		}
 		if (open (I, $f)) {
 			while (<I>) { print O $_; } close I;
 		} else { 
-			print O <<EOT;
+			print O <<'EOT';
 # Sample timidity.cfg - see "man timidity.cfg"
 dir /directory/where/you/keep/your/soundfonts
 
@@ -371,21 +450,19 @@ bank 0
 EOT
 		}
 		close O;
-		&edit("$ENV{PWD}/timidity.cfg");
+		edit("$ENV{PWD}/timidity.cfg");
 	}
 }
 sub man {
 	my @topics = @_ || (
-	'aconnect', 'aplaymidi', 'arecordmidi', 'atacontrol',
-	'audio_stuff',
-	'burncd', 'cdcontrol', 'cdda2wav',  'cdrecord',
-	'File::Format::RIFF',
-	'lame', 'mencoder', 'mkisofs', 'mplayer', 'normalize',
-	'pciconf', 'sndfile-play',
-	'Term::Clui', 'Term::Clui::FileSelect', 
-	'timidity', 'timidity.cfg',
+		'aconnect', 'alsamixer', 'aplaymidi', 'arecordmidi', 'atacontrol',
+		'audio_stuff', 'burncd', 'cdcontrol', 'cdda2wav',  'cdrecord',
+		'File::Format::RIFF', 'icedax', 'lame', 'mencoder', 'mkisofs',
+		'mplayer', 'normalize', 'normalize-audio', 'pciconf', 'sndfile-play',
+		'Term::Clui', 'Term::Clui::FileSelect', 'timidity', 'timidity.cfg',
+		'toolame', 'wodim',
 	);
-	my $topic = &choose('Which topic ?', @topics); return unless $topic;
+	my $topic = choose('Which topic ?', @topics); return unless $topic;
 	if ($topic eq 'audio_stuff') { system "perldoc $0";
 	} elsif ($topic =~ /::/) { system "perldoc $topic";
 	} else { system "$man $topic";
@@ -398,29 +475,6 @@ sub which { my $f; foreach $d (@PATH) {$f="$d/$_[$[]";  return $f if -x $f; }}
 sub tempi {
 	qw(40 42 44 46 48 50 52 54 56 58 60 63 69 72 76 80 84 8 92 96 100 104
 	108 112 116 120 126 132 138 144 152 160 168 176 184 192 200 208);
-}
-
-sub ports {
-	if (!open(P,'aplaymidi -l |')) { die "can't run aplaymidi -l: $!\n"; }
-	while (<P>) {
-		if (/^\s*(\d+:\d)\s+(.*)$/) {
-			my $port = $1;
-			my $device = $2; substr ($device,0,32) = ''; $device =~ s/^\s*//;
-			$outport2device{$port} = $device;
-			$device2outport{$device} = $port;
-		}
-	}
-	close P;
-	if (!open(P,'arecordmidi -l |')) { die "can't run arecordmidi -l: $!\n"; }
-	while (<P>) {
-		if (/^\s*(\d+:\d)\s+(.*)$/) {
-			my $port = $1;
-			my $device = $2; substr ($device,0,32) = ''; $device =~ s/^\s*//;
-			$inport2device{$port} = $device;
-			$device2inport{$device} = $port;
-		}
-	}
-	close P;
 }
 sub timiditycfg {
 	return unless $timidity;
@@ -442,10 +496,10 @@ sub set_cdda_device {
 	if (! $ENV{CDDA_DEVICE}) {
 		if (-e "/dev/cdrom") {
 			$ENV{CDDA_DEVICE} = '/dev/cdrom:@';
-			&inform("using $ENV{CDDA_DEVICE} ...");
+			inform("using $ENV{CDDA_DEVICE} ...");
 			return 1;
 		}
-		&inform("You should set the CDDA_DEVICE environment variable!");
+		inform("You should set the CDDA_DEVICE environment variable!");
 		if (! open (P, "$cdrecord -scanbus |")) {   # will only run as root:-(
 			warn "can't run cdrecord -scanbus: $!\n";
 		} else {
@@ -456,27 +510,28 @@ sub set_cdda_device {
 				if (/^\s+\d.*[^*]$/) { push @devices, $_; }
 			}
 			close P;
-			my $device = &choose("Which Device ?", @devices);
+			my $device = choose("Which Device ?", @devices);
 			$device =~ s/^\s+//;
 			$device =~ s/\s.*$//;
 			$ENV{CDDA_DEVICE} = $device;
 		}
 	}
 	if (! $ENV{CDDA_DEVICE}) {
-		$ENV{CDDA_DEVICE} = &ask('CDDA_DEVICE ?');
+		$ENV{CDDA_DEVICE} = ask('CDDA_DEVICE ?');
 	}
 }
 
 sub tasks {
 	my @tasks = (
-		'rip AudioCD->WAV', 'burn WAV->AudioCD',
-		'rip MP3CD->MP3', 'burn MP3->MP3CD',
-		'encode WAV->MP3', 'decode MP3->WAV',
+		'burn MP3->MP3CD', 'burn WAV->AudioCD',
+		'change Directory', 'configure Timidity', 'connect MIDIports',
+		'convert MIDI->MP3', 'convert MIDI->WAV', 'convert Muscript->MIDI',
+		'copy audio CD', 'decode MP3->WAV',
+		'edit Muscript', 'encode WAV->MP2', 'encode WAV->MP3',
+		'rip AudioCD->WAV', 'rip MP3CD->MP3',
 		'play MIDI,WAV,MP3',
 		'record Keyboard->MIDI',
-		'edit Muscript', 'convert Muscript->MIDI',
-		'convert MIDI->WAV', 'convert MIDI->MP3',
-		'change Directory', 'configure Timidity',
+		'run alsamixer',
 	);
 	if (-e './Makefile') {
 		push @tasks, ('run Make', 'edit Makefile');
@@ -553,12 +608,13 @@ into one ArrowKey-and-Return user-interface,
 
 =item I<rip AudioCD-E<gt>WAV> and I<burn WAV-E<gt>AudioCD>
 
-These features use I<cdda2wav> and I<cdrecord> to get files
+These features use I<cdda2wav> or I<icedax>
+and I<cdrecord> and I<wodim> to get files
 off AudioCDs into I<.wav> format, or vice-versa.
 
 =item I<rip MP3CD-E<gt>MP3> and I<burn MP3-E<gt>MP3CD>
 
-These features use I<cp> and I<cdrecord> to get files
+These features use I<cp> and I<cdrecord> or I<wodim> to get files
 off MP3-CDs onto local hard-disk, or vice-versa.
 
 =item I<encode WAV-E<gt>MP3> and I<decode MP3-E<gt>WAV>
@@ -583,22 +639,26 @@ Peter J Billam  www.pjb.com.au/comp/contact.html
 
 =head1 CREDITS
 
-Based on Term::Clui, aplaymidi, arecordmidi, cdrecord, cdda2wav,
-lame, normalize, mpg123, sndfile_play and timidity.
+Based on Term::Clui, alsamixer, aplaymidi, arecordmidi, cdrecord or wodim,
+cdda2wav or icedax, lame, mpg123, normalize, sndfile_play and timidity.
 
 =head1 SEE ALSO
 
 http://www.pjb.com.au/ ,
 http://search.cpan.org/~pjb , 
 Term::Clui,
+alsamixer(1),
 aplaymidi(1),
 arecordmidi(1),
 cdrecord(1),
 cdda2wav(1),
+icedax(1),
 lame(1),
+mpg123(1),
 normalize(1),
 sndfile_play(1),
-timidity(1)
+timidity(1),
+wodim(1)
 
 =cut
 

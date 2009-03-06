@@ -1,6 +1,5 @@
 use ExtUtils::MakeMaker;
 
-
 my $have_Term_ReadKey = 1;
 eval 'require "Term/ReadKey.pm"';
 if ($@) { $have_Term_ReadKey = 0; }

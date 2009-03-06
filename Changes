@@ -36,3 +36,4 @@
 20070309 1.38 choose with a long list asking for a clue offers ^X to quit
 20070309 1.39 no change
 20070511 1.40 removed spurious debug command: &puts("returned")
+20090307 1.41 icol,irow managed by puts; Install removed; Py3 translation

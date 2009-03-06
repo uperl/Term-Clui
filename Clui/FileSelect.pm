@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.40';
+$VERSION = '1.41';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
@@ -46,20 +46,24 @@ sub select_file {   my %option = @_;
 		if (index $dir, $option{'-TopDir'}) { $dir = $option{'-TopDir'}; }
 	}
 
-   my ($new, $file, @allfiles, @files, @dirs, @pre, @post, %seen, $isnew);
+	my ($new, $file, @allfiles, @files, @dirs, @pre, @post, %seen, $isnew);
 	my @dotfiles;
 
-   while () {
-      if (! opendir (D, $dir)) { warn "can't opendir $dir: $!\n"; return 0; }
+	while () {
+		if (! opendir (D, $dir)) { warn "can't opendir $dir: $!\n"; return 0; }
 		if ($option{'-SelDir'}) { @pre = ('./'); } else { @pre = (); }
 		@post = ();
 		@allfiles = sort grep(!/^\.\.?$/, readdir D); closedir D;
 		@dotfiles = grep(/^\./, @allfiles);
 		if ($option{'-ShowAll'}) {
-			if (@dotfiles && !$option{'-DisableShowAll'}) {@post='Hide DotFiles';}
+			if (@dotfiles && !$option{'-DisableShowAll'}) {
+				@post='Hide DotFiles';
+			}
 		} else {
 			@allfiles = grep(!/^\./, @allfiles);
-			if (@dotfiles && !$option{'-DisableShowAll'}) {@post='Show DotFiles';}
+			if (@dotfiles && !$option{'-DisableShowAll'}) {
+				@post='Show DotFiles';
+			}
 		}
 		# split @allfiles into @files and @dirs for option processing ...
 		@dirs  = grep(-d "$dir/$_" && -r "$dir/$_", @allfiles);
@@ -75,7 +79,7 @@ sub select_file {   my %option = @_;
 		if ($option{'-Chdir'}) {
 			foreach (@dirs) { s#$#/#; }
 			if ($option{'-TopDir'}) {
-      		my $up = $dir; $up =~ s#[^/]+/?$##;   # find parent directory
+				my $up = $dir; $up =~ s#[^/]+/?$##;   # find parent directory
 				if (-1 < index $up, $option{'-TopDir'}) { unshift @pre, '../'; }
 				# must check for symlinks to outside the TopDir ...
 			} else { unshift @pre, '../';
@@ -84,35 +88,33 @@ sub select_file {   my %option = @_;
 			@dirs = ();
 		}
 		if ($option{'-Create'})     { unshift @post, 'Create New File'; }
-      if ($option{'-TextFile'})   { @files = grep(-T "$dir/$_", @files); }
-      if ($option{'-Owned'})      { @files = grep(-o "$dir/$_", @files); }
-      if ($option{'-Executable'}) { @files = grep(-x "$dir/$_", @files); }
-      if ($option{'-Writeable'})  { @files = grep(-w "$dir/$_", @files); }
-      if ($option{'-Readable'})   { @files = grep(-r "$dir/$_", @files); }
+		if ($option{'-TextFile'})   { @files = grep(-T "$dir/$_", @files); }
+		if ($option{'-Owned'})      { @files = grep(-o "$dir/$_", @files); }
+		if ($option{'-Executable'}) { @files = grep(-x "$dir/$_", @files); }
+		if ($option{'-Writeable'})  { @files = grep(-w "$dir/$_", @files); }
+		if ($option{'-Readable'})   { @files = grep(-r "$dir/$_", @files); }
 		@allfiles = (@pre, (sort @dirs,@files), @post); # reconstitute @allfiles
 
 		my $title;
-      if ($option{'-Title'}) { $title = "$option{'-Title'} in $dir"
+		if ($option{'-Title'}) { $title = "$option{'-Title'} in $dir"
 		} else { $title = "in directory $dir ?";
 		}
-		if ($option{'-File'} && dbmopen (%CHOICES, "$home/db/choices", 0600)) {
-			$CHOICES{$title} = $option{'-File'}; dbmclose %CHOICES;
-		}
+		if ($option{'-File'}) { &set_default($title, $option{'-File'}) }
 		if ($multichoice) {
 			my @new = &choose ($title, @allfiles);
-      	return () unless @new;
+			return () unless @new;
 			foreach (@new) { $_="$dir$_"; }
 			return @new;
 		}
-      $new = &choose ($title, @allfiles);
+		$new = &choose ($title, @allfiles);
 
 		if ($option{'-ShowAll'} && $new eq 'Hide DotFiles') {
 			delete $option{'-ShowAll'}; redo;
 		} elsif (!$option{'-ShowAll'} && $new eq 'Show DotFiles') {
 			$option{'-ShowAll'} = 1; redo;
 		}
-      if ($new eq "Create New File") {
-         $new = &ask ("new file name ?");  # validating this is a chore ...
+		if ($new eq "Create New File") {
+			$new = &ask ("new file name ?");  # validating this is a chore ...
 			if (! $new) { next; }
 			if ($new =~ m#^/#) { $file = $new; } else { $file = "$dir$new"; }
 			$file =~ s#/+#/#g;  # simplify //// down to /
@@ -125,7 +127,8 @@ sub select_file {   my %option = @_;
 			}
 			if (-d $file) {  # pre-existing directory ?
 				if ($option{'-SelDir'}) { return $file;
-				} else { $dir=$file; if ($dir =~ m#[^/]$#) { $dir.='/'; } next;
+				} else {
+					$dir=$file; if ($dir =~ m#[^/]$#) { $dir.='/'; } next;
 				}
 			}
 			$file =~ m#^(.*/)([^/]+)$#;
@@ -134,19 +137,19 @@ sub select_file {   my %option = @_;
 			if (-d $1 && -w $1) { return $file; }
 			if (!-d $1) { &sorry ("directory $1 does not exist."); next; }
 			&sorry ("directory $1 is not writeable."); next;
-      }
-      return undef unless $new;
-      if ($new eq './' && $option{'-SelDir'}) { return $dir; }
-      if ($new =~ m#^/#) { $file = $new; # abs filename
-      } else { $file = "$dir$new";       # rel filename (slash always at end)
-      }
-      if ($new eq '../') { $dir =~ s#[^/]+/?$##; &back_up(); next;
-      } elsif ($new eq './') {
+		}
+		return undef unless $new;
+		if ($new eq './' && $option{'-SelDir'}) { return $dir; }
+		if ($new =~ m#^/#) { $file = $new; # abs filename
+		} else { $file = "$dir$new";       # rel filename (slash always at end)
+		}
+		if ($new eq '../') { $dir =~ s#[^/]+/?$##; &back_up(); next;
+		} elsif ($new eq './') {
 			if ($option{'-SelDir'}) { return $dir; } $file = $dir;
-      } elsif ($file =~ m#/$#) { $dir = $file; &back_up(); next;
-      } elsif (-f $file) { return $file;
-      }
-   }
+		} elsif ($file =~ m#/$#) { $dir = $file; &back_up(); next;
+		} elsif (-f $file) { return $file;
+		}
+	}
 }
 1;
 
@@ -182,8 +185,7 @@ when I<file_select> is invoked in a list context, with -Chdir=>0
 and without -Create.  It is currently not possible
 to select multiple files lying in different directories.
 
-This is Term::Clui::FileSelect.pm version 1.40,
-#COMMENT#.
+This is Term::Clui::FileSelect.pm version 1.41
 
 =head1 SUBROUTINES
 
