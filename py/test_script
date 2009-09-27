@@ -1,4 +1,4 @@
-#! /usr/local/bin/python3.0
+#! /usr/local/bin/python3
 
 #########################################################################
 #       This Python script is Copyright (c) 2002, Peter J Billam        #
@@ -26,11 +26,13 @@ def main():
 def test_choose():
     colours = ['Red','Orange','Black','Grey','Blue']
     paints  = [
-      'Alizarin Crimson', 'Burnt Sienna', 'Cadmium Yellow', 'Cobalt Blue',
-    'Flake White', 'Indian Red', 'Indian Yellow', 'Ivory Black', 'Lemon Yellow',
-    'Naples Yellow', 'Prussian Blue', 'Raw Sienna', 'Raw Umber', 'Red Ochre',
-      'Rose Madder', 'Ultramarine Blue', 'Vandyke Brown', 'Viridian Green',
-    'Yellow Ochre'
+     'Bizzare extremely long name that certainly will never occur on any real artist pallette',
+     'Alizarin Crimson', 'Burnt Sienna', 'Cadmium Yellow', 'Cobalt Blue',
+     'Flake White', 'Indian Red', 'Indian Yellow', 'Ivory Black',
+     'Lemon Yellow',
+     'Naples Yellow', 'Prussian Blue', 'Raw Sienna', 'Raw Umber', 'Red Ochre',
+     'Rose Madder', 'Ultramarine Blue', 'Vandyke Brown', 'Viridian Green',
+     'Yellow Ochre'
     ]
     scientists = [
     'Luis Alvarez', 'Alain Aspect', 'Michael Barnsley', 'Johann Bernouilli',

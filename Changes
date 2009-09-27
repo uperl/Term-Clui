@@ -37,3 +37,4 @@
 20070309 1.39 no change
 20070511 1.40 removed spurious debug command: &puts("returned")
 20090307 1.41 icol,irow managed by puts; Install removed; Py3 translation
+20090928 1.42 fixed bug in &choose with items longer than screen-width

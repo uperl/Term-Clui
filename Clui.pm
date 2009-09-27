@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.41';
+$VERSION = '1.42';   # fixed bug in choose with items longer than screen-width
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -469,6 +469,7 @@ sub layout { my @list = @_;
 	$this_cell = 0; my $irow = 1; my $icol = 0;  my $i;
 	for ($i=$[; $i<=$#list; $i++) {
 		$l[$i] = length ($list[$i]) + 2;
+		if ($l[$i] > $maxcols-1) { $l[$i] = $maxcols-1; }  # 1.42
 		if (($icol + $l[$i]) >= $maxcols ) { $irow++; $icol = 0; }
 		if ($irow > $maxrows) { return $irow; }  # save time
 		$irow[$i] = $irow; $icol[$i] = $icol;
@@ -480,7 +481,6 @@ sub layout { my @list = @_;
 sub wr_screen {
 	my $i;
 	for ($i=$[; $i<=$#list; $i++) {
-		# &wr_cell($i, $this_cell) unless $i==$this_cell;
 		&wr_cell($i) unless $i==$this_cell;
 	}
 	if ($notherlines && ($nrows+$notherlines) < $maxrows) {
@@ -493,8 +493,9 @@ sub wr_cell { my $i = shift;
 	if ($marked[$i]) { &attrset($A_BOLD); }
 	if ($i == $this_cell) { &attrset($A_REVERSE); }
 	my $no_tabs = $list[$i];
-	$no_tabs =~ s/\t/ /;
-	$no_tabs =~ s/^(.{1,77}).*/$1/;
+	$no_tabs =~ s/\t/ /g;
+	# $no_tabs =~ s/^(.{1,77}).*/$1/;  # whadyamean, 77 ? substr ?
+	$no_tabs = substr $no_tabs, $[, $maxcols-1;  # 1.42
 	&puts(" $no_tabs ");
 	if ($marked[$i] || $i == $this_cell) { &attrset($A_NORMAL); }
 }
@@ -890,13 +891,18 @@ Term::Clui.pm - Perl module offering a Command-Line User Interface
  use Term::Clui;
  $chosen = &choose("A Title", @a_list);  # single choice
  @chosen = &choose("A Title", @a_list);  # multiple choice
- $x = &choose("Which ?\n(Arrow-keys and Return)", @w); # multi-line question
+ # multi-line question-texts are possible...
+ $x = &choose("Which ?\n(Arrow-keys and Return)", @w);
+
  if (&confirm($text)) { &do_something(); };
+
  $answer = &ask($question);
  $answer = &ask($question,$suggestion);
  $password = &ask_password("Enter password : ");
+
  $newtext = &edit($title, $oldtext);
  &edit($filename);
+
  &view($title, $text)  # if $title is not a filename
  &view($textfile)  # if $textfile _is_ a filename
 
@@ -928,7 +934,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.41
+This is Term::Clui.pm version 1.42
 
 =head1 WINDOW-SIZE
 
@@ -1143,6 +1149,15 @@ and various other stuff.
 =item I<test_script>
 
 This is the test script, as used during development.
+
+=item I<choose>
+
+This is a script which wraps Term::Clui::choose for use at the shell-script
+level. It can either choose between command-line arguments,
+or, with the B<-f> (filter) option, between lines of STDIN, like grep.
+A B<-m> (multiple) option allows multiple-choice.
+This can be a very useful script, and you may want to copy it into
+C</usr/local/bin/> ...
 
 =back
 

@@ -45,12 +45,12 @@ TermClui.py does not use curses (a whole-of-screen interface),
 it uses a small and portable subset of vt100 sequences.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.41
+Term::Clui and Term::Clui::FileSelect.  This is version 1.42
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.41'
+VERSION = '1.42'
 
 # ------------------------ vt100 stuff -------------------------
 
@@ -707,6 +707,8 @@ def _layout(my_list):
     i = 0
     while (i < len(my_list)):
         l.append(len(my_list[i]) + 2)
+        if (l[i] > _maxcols-1):
+            l[i] = _maxcols-1
         if ((my_icol + l[i]) >= _maxcols):
             my_irow += 1
             my_icol = 0
@@ -743,7 +745,7 @@ def _wr_cell(i):
         _attrset(_A_REVERSE)
     no_tabs = _list[i]
     no_tabs = re.sub("\t", " ", no_tabs)
-    # $no_tabs =~ s/^(.{1,77}).*/$1/;
+    no_tabs = no_tabs[:_maxcols-1]  # 1.42
     _puts(" " + no_tabs + " ")
     if _marked[i] or (i == _this_cell):
         _attrset(_A_NORMAL)

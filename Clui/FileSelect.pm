@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.41';
+$VERSION = '1.42';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
@@ -23,7 +23,9 @@ $home =~ s#([^/])$#$1/#;
 sub select_file {   my %option = @_;
 	if (!defined $option{'-Path'}) { $option{'-Path'}=$option{'-initialdir'}; }
 	if (!defined $option{'-FPat'}) { $option{'-FPat'}=$option{'-filter'}; }
-	if (!defined $option{'-ShowAll'}) {$option{'-ShowAll'}=$option{'-dotfiles'};}
+	if (!defined $option{'-ShowAll'}) {
+		$option{'-ShowAll'} = $option{'-dotfiles'};
+	}
 	if ($option{'-Directory'}) { $option{'-Chdir'}=1; $option{'-SelDir'}=1; }
 	my $multichoice = 0;
 	if (wantarray && !$option{'-Chdir'} && !$option{'-Create'}) {
@@ -166,8 +168,8 @@ Term::Clui::FileSelect - Perl module to ask the user to select a file.
  use Term::Clui;
  use Term::Clui::FileSelect;
  $file = &select_file(-Readable=>1, -TopDir=>"/home", -FPat=>"*.html");
- @files = &select_file(-Chdir=>0, -Path=$ENV{PWD}, -FPat=>"*.mp3");
- chdir &select_file(-Directory=>1, -Path=$ENV{PWD});
+ @files = &select_file(-Chdir=>0, -Path=>$ENV{PWD}, -FPat=>"*.mp3");
+ chdir &select_file(-Directory=>1, -Path=>$ENV{PWD});
 
 =head1 DESCRIPTION
 
@@ -185,7 +187,7 @@ when I<file_select> is invoked in a list context, with -Chdir=>0
 and without -Create.  It is currently not possible
 to select multiple files lying in different directories.
 
-This is Term::Clui::FileSelect.pm version 1.41
+This is Term::Clui::FileSelect.pm version 1.42
 
 =head1 SUBROUTINES
 

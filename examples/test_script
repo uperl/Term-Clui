@@ -34,6 +34,7 @@ while (1) {
 sub test_choose {
 	my @colours = ('Red','Orange','Black','Grey','Blue');
 	my @paints  = (
+	'Bizzare extremely long name that certainly will never occur on any real artist pallette',
   	'Alizarin Crimson', 'Burnt Sienna', 'Cadmium Yellow', 'Cobalt Blue',
 	'Flake White', 'Indian Red', 'Indian Yellow', 'Ivory Black', 'Lemon Yellow',
 	'Naples Yellow', 'Prussian Blue', 'Raw Sienna', 'Raw Umber', 'Red Ochre',
