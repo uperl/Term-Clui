@@ -38,3 +38,4 @@
 20070511 1.40 removed spurious debug command: &puts("returned")
 20090307 1.41 icol,irow managed by puts; Install removed; Py3 translation
 20090928 1.42 fixed bug in &choose with items longer than screen-width
+20091003 1.43 choose and inform use :encoding(utf8) when in a utf8 environment

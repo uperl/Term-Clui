@@ -45,12 +45,12 @@ TermClui.py does not use curses (a whole-of-screen interface),
 it uses a small and portable subset of vt100 sequences.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.42
+Term::Clui and Term::Clui::FileSelect.  This is version 1.43
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.42'
+VERSION = '1.43'
 
 # ------------------------ vt100 stuff -------------------------
 

@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.42';   # fixed bug in choose with items longer than screen-width
+$VERSION = '1.43';   # uses :encoding(utf8) in a utf8 environment
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -23,9 +23,14 @@ my $have_Term_Size = 0;
 eval 'require "Term/ReadKey.pm"';
 if ($@) {
 	$have_Term_ReadKey = 0;
-	my $have_Term_Size = 1;
+	$have_Term_Size = 1;
 	eval 'require "Term/Size.pm"';
 	if ($@) { $have_Term_Size = 0; }
+}
+
+my $EncodingString = q{};
+if (($ENV{LANG} =~ /utf-?8/i) || ($ENV{LC_TYPE} =~ /utf-?8/i)) {
+	$EncodingString = ':encoding(utf8)';
 }
 
 # ------------------------ vt100 stuff -------------------------
@@ -48,7 +53,7 @@ my $irow; my $icol;   # maintained by &puts, &up, &down, &left and &right
 sub puts   { my $s = join q{}, @_;
 	$irow += ($s =~ tr/\n/\n/);
 	if ($s =~ /\r\n?$/) { $icol = 0;
-	} else { $icol += length ($s);
+	} else { $icol += length($s);
 	}
 	print TTY $s;
 }
@@ -150,10 +155,10 @@ sub left  {
 sub goto { my $newcol = shift; my $newrow = shift;
 	if ($newcol == 0) { print TTY "\r" ; $icol = 0;
 	} elsif ($newcol > $icol) { &right($newcol-$icol);
-	} elsif ($newcol < $icol) { &left ($icol-$newcol);
+	} elsif ($newcol < $icol) { &left($icol-$newcol);
 	}
-	if ($newrow > $irow)      { &down ($newrow-$irow);
-	} elsif ($newrow < $irow) { &up   ($irow-$newrow);
+	if ($newrow > $irow)      { &down($newrow-$irow);
+	} elsif ($newrow < $irow) { &up($irow-$newrow);
 	}
 }
 # sub move { my ($ix,$iy) = @_; printf TTY "\033[%d;%dH",$iy+1,$ix+1; }
@@ -164,9 +169,11 @@ sub initscr {
 	if ($initscr_already_run) {
 		$icol = 0; $irow = 0; $initscr_already_run++; return;
 	}
-	open(TTY, ">/dev/tty")  || (warn "Can't write /dev/tty: $!\n", return 0);
+	open(TTY, ">$EncodingString", '/dev/tty')   # 1.43
+	 || (warn "Can't write /dev/tty: $!\n", return 0);
 	if (!$have_Term_ReadKey) { $stty = `stty -g`; chop $stty; }
-	open(TTYIN, "</dev/tty") || (warn "Can't read /dev/tty: $!\n", return 0);
+	open(TTYIN, "<$EncodingString", '/dev/tty')   # 1.43
+	 || (warn "Can't read /dev/tty: $!\n", return 0);
 
 	if ($have_Term_ReadKey) {
 		Term::ReadKey::ReadMode('ultra-raw', *TTYIN);
@@ -176,7 +183,7 @@ sub initscr {
 		}
 	}
 
-	select((select(TTY), $| = 1)[$[]); print TTY "";
+	select((select(TTY), $| = 1)[$[]); print TTY q{};
 	$rin = q{}; vec($rin, fileno(TTYIN), 1) = 1;
 	$icol = 0; $irow = 0; $initscr_already_run = 1;
 }
@@ -228,7 +235,7 @@ $SIG{'WINCH'} = sub { $size_changed = 1; };
 # could be preserved by checking whether the 2nd arg is a hashref ...
 
 sub ask_password { # no echo - use for passwords
-	local ($silent) = 'yes'; &ask ($_[$[]);
+	local ($silent) = 'yes'; &ask($_[$[]);
 }
 sub ask { my ($question, $default) = @_;
 	return q{} unless $question;
@@ -237,20 +244,20 @@ sub ask { my ($question, $default) = @_;
 	my $i = 0; my $n = 0; my @s = (); # cursor position, length, string
 	if ($default) {
 		$default =~ s/\t/	/g;
-		@s = split (q{}, $default); $n = scalar @s; $i = $[;
+		@s = split(q{}, $default); $n = scalar @s; $i = $[;
 		foreach $j ($[ .. $n) { &puts($s[$j]); }
 		&left($n);
 	}
 
 	while (1) {
-		$c = &getch();
+		my $c = &getch();
 		if ($c eq "\r") { &erase_lines(1); last; }
 		if ($size_changed) {
 			&erase_lines(0); $nol = &display_question($question);
 		}
 		if ($c == $KEY_LEFT && $i > 0) { $i--; &left(1);
 		} elsif ($c == $KEY_RIGHT) {
-			if ($i < $n) { &puts ($silent ? "x" : $s[$i]); $i++; }
+			if ($i < $n) { &puts($silent ? "x" : $s[$i]); $i++; }
 		} elsif (($c eq "\cH") || ($c eq "\c?")) {
 			if ($i > 0) {
 			 	$n--; $i--; splice(@s, $i, 1); &left(1);
@@ -262,13 +269,15 @@ sub ask { my ($question, $default) = @_;
 		} elsif ($c eq "\cB") { &left($i); $i = 0;
 		} elsif ($c eq "\cE") { &right($n-$i); $i = $n;
 		} elsif ($c eq "\cL") {  # redraw ...
-		} elsif ($c > 255) { &beep();
-		} elsif ($c =~ /^[\040-\376]$/) {
+		#} elsif ($c > 255) { &beep();
+		#} elsif ($c =~ /^[\040-\376]$/) {
+		} else {  # 1.43
 			splice(@s, $i, 0, $c);
-			$n++; $i++; &puts($silent ? "x" : $c);
+			&puts($silent ? "x" : $c);
+			$n++; $i++;
 			foreach $j ($i .. $n) { &puts($s[$j]); }
 			&clrtoeol();  &left($n-$i);
-		} else { &beep();
+		#} else { &beep();
 		}
 	}
 	&endwin(); $silent = q{}; return join("", @s);
@@ -296,7 +305,7 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 
 	$question =~ s/^[\n\r]+//;   # strip initial newline(s)
 	$question =~ s/[\n\r]+$//;   # strip final newline(s)
-	my ($firstline,$otherlines) = split (/\r?\n/, $question, 2);
+	my ($firstline,$otherlines) = split(/\r?\n/, $question, 2);
 	my $firstlinelength = length $firstline;
 
 	$choice = &get_default($firstline);
@@ -323,7 +332,7 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 	if ($nrows >= $maxrows) {
 		@list = &narrow_the_search(@list);
 		if (! @list) {
-			&up(1); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
+			&up(1); &clrtoeol(); &endwin(); $clue_has_been_given = 0;
 			return wantarray ? () : undef;
 		}
 	}
@@ -336,7 +345,7 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 			if ($nrows >= $maxrows) {
 				@list = &narrow_the_search(@list);
 				if (! @list) {
-					&up(1); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
+					&up(1); &clrtoeol(); &endwin(); $clue_has_been_given = 0;
 					return wantarray ? () : undef;
 				}
 			}
@@ -351,11 +360,11 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 					$irow = 1;
 					@list = &narrow_the_search(@biglist); &wr_screen(); next;
 				} else {
-					&up(1); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
+					&up(1); &clrtoeol(); &endwin(); $clue_has_been_given = 0;
 					return wantarray ? () : undef;
 				}
 			}
-			&goto (0,0); &clrtoeol(); &endwin (); $clue_has_been_given = 0;
+			&goto(0,0); &clrtoeol(); &endwin(); $clue_has_been_given = 0;
 			return wantarray ? () : undef;
 		} elsif (($c eq "\t") && ($this_cell < $#list)) {
 			$this_cell++; &wr_cell($this_cell-1);
@@ -407,7 +416,7 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 				if ($nrows >= $maxrows) {
 					@list = &narrow_the_search(@list);
 					if (! @list) {
-						&up(1); &clrtoeol(); &endwin ();
+						&up(1); &clrtoeol(); &endwin();
 						$clue_has_been_given = 0;
 						return wantarray ? () : undef;
 					}
@@ -445,7 +454,7 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 				&puts($list[$this_cell]."\n\r");
 			}
 			&endwin();
-			&set_default($firstline, $list[$this_cell]); # join ($,,@chosen) ?
+			&set_default($firstline, $list[$this_cell]); # join($,,@chosen) ?
 			$clue_has_been_given = 0;
 			if (wantarray) { return @chosen;
 			} else { return $list[$this_cell];
@@ -462,13 +471,13 @@ sub choose {  local ($question, @list) = @_;  # @list must be local
 			}
 		}
 	}
-	&endwin ();
+	&endwin();
 	warn "choose: shouldn't reach here ...\n";
 }
 sub layout { my @list = @_;
 	$this_cell = 0; my $irow = 1; my $icol = 0;  my $i;
 	for ($i=$[; $i<=$#list; $i++) {
-		$l[$i] = length ($list[$i]) + 2;
+		$l[$i] = length($list[$i]) + 2;
 		if ($l[$i] > $maxcols-1) { $l[$i] = $maxcols-1; }  # 1.42
 		if (($icol + $l[$i]) >= $maxcols ) { $irow++; $icol = 0; }
 		if ($irow > $maxrows) { return $irow; }  # save time
@@ -489,8 +498,8 @@ sub wr_screen {
 	&wr_cell($this_cell);
 }
 sub wr_cell { my $i = shift;
-	&goto ($icol[$i], $irow[$i]);
-	if ($marked[$i]) { &attrset($A_BOLD); }
+	&goto($icol[$i], $irow[$i]);
+	if ($marked[$i]) { &attrset($A_BOLD | $A_UNDERLINE); }
 	if ($i == $this_cell) { &attrset($A_REVERSE); }
 	my $no_tabs = $list[$i];
 	$no_tabs =~ s/\t/ /g;
@@ -596,12 +605,12 @@ sub get_default { my ($question) = @_;
 	} else { return $choices[$[];
 	}
 }
-sub set_default { my $question = shift; my $s = join ($; , @_);
+sub set_default { my $question = shift; my $s = join($; , @_);
 	if ($ENV{CLUI_DIR} eq 'OFF') { return undef; }
 	if (! $question) { return undef; }
 	my $n_tries = 5;
 	while ($n_tries--) {
-		if (dbmopen (%CHOICES, &dbm_file(), 0600)) {
+		if (dbmopen(%CHOICES, &dbm_file(), 0600)) {
 			last;
 		} else { 
 			if ($! eq 'Resource temporarily unavailable') {
@@ -630,7 +639,7 @@ sub dbm_file {
 sub confirm { my $question = shift;  # asks user Yes|No, returns 1|0
 	return(0) unless $question;  return(0) unless -t STDERR;
 	&initscr();
-	my $nol = &display_question($question); &puts (" (y/n) ");
+	my $nol = &display_question($question); &puts(" (y/n) ");
 	while (1) {
 		$response=&getch();  last if ($response=~/[yYnN]/);  &beep();
 	}
@@ -653,20 +662,20 @@ sub edit {	my ($title, $text) = @_;
 		$tmpdir = '/tmp';
 		($safename = $title) =~ s/[\W_]+/_/g;
 		$file = "$tmpdir/$safename.$$";
-		if (!open (F,">$file")) {&sorry("can't open $file: $!\n");return q{};}
+		if (!open(F,">$file")) {&sorry("can't open $file: $!\n");return q{};}
 		print F $text; close F;
 		$editor = $ENV{EDITOR} || "vi"; # should also look in ~/db/choices.db
 		system "$editor $file";
-		if (!open (F,"< $file")) {&sorry ("can't open $file: $!\n");return 0;}
+		if (!open(F,"< $file")) {&sorry("can't open $file: $!\n");return 0;}
 		undef $/; $text = <F>; $/ = "\n";
 		close F; unlink $file; return $text;
 	} elsif ($argc == 1) {	# its a file, we will try RCS ...
 		my $file = $title;
 
 		# weed out no-go situations
-		if (-d $file) {&sorry ("$file is already a directory\n"); return 0;}
+		if (-d $file) {&sorry("$file is already a directory\n"); return 0;}
 		if (-B _ && -s _) {&sorry("$file is not a text file\n"); return 0;}
-		if (-T _ && !-w _) { &view ($file); return 1; }
+		if (-T _ && !-w _) { &view($file); return 1; }
 	
 		# it's a writeable text file, so work out the locations
 		if ($file =~ /\//) {
@@ -698,29 +707,29 @@ sub edit {	my ($title, $text) = @_;
 	
 		if ($rcs_ok && -T $file) {	 # check it in
 			if (!-f $rcsfile) {
-				my $msg = &ask ("$file is new. Please describe it:");
+				my $msg = &ask("$file is new. Please describe it:");
 				my $quotedmsg = $msg;  $quotedmsg =~ s/'/'"'"'/g;
 				if ($msg) {
 					system "ci -q -l -t-'$quotedmsg' -i $file $rcsfile";
-					&logit ($basename, $msg);
+					&logit($basename, $msg);
 				}
 			} else {
-				my $msg = &ask ("What changes have you made to $file ?");
+				my $msg = &ask("What changes have you made to $file ?");
 				my $quotedmsg = $msg;  $quotedmsg =~ s/'/'"'"'/g;
 				if ($msg) {
 					system "ci -q -l -m'$quotedmsg' $file $rcsfile";
-					&logit ($basename, $msg);
+					&logit($basename, $msg);
 				}
 			}
 		}
 	}
 }
 sub logit { my ($file, $msg) = @_;
-	if (! open (LOG, ">> $rcslog")) {  warn "can't open $rcslog: $!\n";
+	if (! open(LOG, ">> $rcslog")) {  warn "can't open $rcslog: $!\n";
 	} else {
 		$pid = fork;	# log in background for better response time
 		if (! $pid) {
-			($user) = getpwuid ($>);
+			($user) = getpwuid($>);
 			print LOG &timestamp, " $file $user $msg\n"; close LOG;
 			if ($pid == 0) { exit 0; }	# the child's end, if a fork occurred
 		}
@@ -730,7 +739,7 @@ sub timestamp {
 	# returns current date and time in "199403011 113520" format
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
 	$wday += 0; $yday += 0; $isdst += 0; # avoid bloody -w warning
-	return sprintf ("%4.4d%2.2d%2.2d %2.2d%2.2d%2.2d",
+	return sprintf("%4.4d%2.2d%2.2d %2.2d%2.2d%2.2d",
 		$year+1900, $mon+1, $mday, $hour, $min, $sec);
 }
 
@@ -741,7 +750,8 @@ sub sorry { # warns user of an error condition
 }
 sub inform { my $text = $_[$[];
 	$text =~ s/([^\n])$/$1\n/s;
-	if (open(TTY, ">/dev/tty")) { print TTY $text; close TTY;
+	if (open(TTY, ">$EncodingString", '/dev/tty')) {  # 1.43
+		print TTY $text; close TTY;
 	} else { warn $text;
 	}
 }
@@ -758,19 +768,19 @@ sub view {	my ($title, $text) = @_;	# or ($filename) =
 		if ($nlines > (0.6*$maxrows)) {
 			system (($ENV{PAGER} || $default_pager) . " \'$title\'");
 		} else {
-			open (F,"< $title"); undef $/; $text=<F>; $/="\n"; close F;
+			open(F,"< $title"); undef $/; $text=<F>; $/="\n"; close F;
 			&tiview($title, $text);
 		}
 	} else {
-		local (@lines) = split (/\r?\n/, $text, $maxrows);
+		local (@lines) = split(/\r?\n/, $text, $maxrows);
 		if (($#lines - $[) < 21) {
-			&tiview ($title, $text);
+			&tiview($title, $text);
 		} else {
 			local ($safetitle); ($safetitle = $title) =~ s/[^a-zA-Z0-9]+/_/g;
 			local ($tmp) = "/tmp/$safetitle.$$";
 			if (!open(TMP, ">$tmp")) {warn "can't open $tmp: $!\n"; return;}
 			print TMP $text;	close TMP;
-			system (($ENV{PAGER} || $default_pager) . " \'$tmp\'");
+			system(($ENV{PAGER} || $default_pager) . " \'$tmp\'");
 			unlink $tmp;
 			return 1;
 		}
@@ -786,11 +796,11 @@ sub tiview {	my ($title, $text) = @_;
 	if (3 > scalar @rows) {
 		&puts(join("\r\n",@rows), "\r\n"); &endwin(); return 1;
 	}
-	if ($titlelength > ($maxcols-35)) { &puts ("$title\r\n");
-	} else { &puts ("$title   (<enter> to continue, q to clear)\r\n");
+	if ($titlelength > ($maxcols-35)) { &puts("$title\r\n");
+	} else { &puts("$title   (<enter> to continue, q to clear)\r\n");
 	}
 	&puts("\r", join("\e[K\r\n",@rows), "\r");
-	$icol = 0; $irow = scalar @rows; &goto ($titlelength+1, 0);
+	$icol = 0; $irow = scalar @rows; &goto($titlelength+1, 0);
 	
 	while (1) {
 		$c = &getch();
@@ -798,7 +808,7 @@ sub tiview {	my ($title, $text) = @_;
 		|| $c eq "\cC" || $c eq "\c\\") {
 			&erase_lines(0); &endwin(); return 1;
 		} elsif ($c eq "\r") {  # <enter> retains text on screen
-			&clrtoeol(); &goto (0, @rows+1); &endwin(); return 1;
+			&clrtoeol(); &goto(0, @rows+1); &endwin(); return 1;
 		} elsif ($c eq "\cL") {
 			&puts("\r"); &endwin(); &tiview($title,$text); return 1;
 		}
@@ -815,7 +825,7 @@ sub display_question {   my $question = shift; my %options = @_;
 	if ($options{nofirstline}) {
 		@otherlines = &fmt($question);
 	} else {
-		($firstline,$otherlines) = split (/\r?\n/, $question, 2);
+		($firstline,$otherlines) = split(/\r?\n/, $question, 2);
 		@otherlines = &fmt($otherlines);
 		if ($firstline) { &puts("$firstline "); }
 	}
@@ -832,7 +842,7 @@ sub fmt { my $text = shift; my %options = @_;
 	# Used by tiview, ask and confirm; formats the text within $maxcols cols
 	my (@i_words, $o_line, @o_lines, $o_length, $last_line_empty, $w_length);
 	my (@i_lines, $initial_space);
-	@i_lines = split (/\r?\n/, $text);
+	@i_lines = split(/\r?\n/, $text);
 	foreach $i_line (@i_lines) {
 		if ($i_line =~ /^\s*$/) {   # blank line ?
 			if ($o_line) { push @o_lines, $o_line; $o_line=q{}; $o_length=0; }
@@ -852,7 +862,7 @@ sub fmt { my $text = shift; my %options = @_;
 			$initial_space = q{};
 		}
 
-		@i_words = split (' ', $i_line);
+		@i_words = split(' ', $i_line);
 		foreach $i_word (@i_words) {
 			$w_length = length $i_word;
 			if (($o_length + $w_length) > $maxcols) {
@@ -867,12 +877,13 @@ sub fmt { my $text = shift; my %options = @_;
 		}
 	}
 	if ($o_line) { push @o_lines, $o_line; }
-	if ((scalar @o_lines) < $maxrows-2) { return (@o_lines);
+	if ((scalar @o_lines) < $maxrows-2) { return(@o_lines);
 	} else { return splice (@o_lines, $[, $maxrows-2);
 	}
 }
 sub back_up {
-	open(TTY, ">/dev/tty") || (warn "Can't write /dev/tty: $!\n", return 0);
+	open(TTY, '>', '/dev/tty')   # 1.43
+	 || (warn "Can't write /dev/tty: $!\n", return 0);
 	print TTY "\r\033[K\033[A\033[K";
 	close TTY;
 }
@@ -934,7 +945,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.42
+This is Term::Clui.pm version 1.43
 
 =head1 WINDOW-SIZE
 
@@ -1115,6 +1126,10 @@ its database of previous choices.
 The whole default database mechanism can be disabled by
 I<CLUI_DIR = OFF> if you really want to :-(
 
+If either the LANG or the LC_TYPE environment variables
+contain the string I<utf8> (case insensitive), then I<&choose> and
+I<&inform> open I</dev/tty> with a I<uft8> encoding.
+
 I<Term::Clui> also consults the environment variables
 HOME, LOGDIR, EDITOR and PAGER, if they are set.
 
@@ -1157,7 +1172,7 @@ level. It can either choose between command-line arguments,
 or, with the B<-f> (filter) option, between lines of STDIN, like grep.
 A B<-m> (multiple) option allows multiple-choice.
 This can be a very useful script, and you may want to copy it into
-C</usr/local/bin/> ...
+I</usr/local/bin/> or elsewhere in your PATH.
 
 =back
 

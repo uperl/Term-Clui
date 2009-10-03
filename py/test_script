@@ -89,7 +89,7 @@ leaving the question and answer on the screen as a record of the dialogue.
 The other lines should only get displayed if there is room.
 '''
         colour = choose (multiline_question, colours);
-        print('paint='+paint+', scientist='+scientist+', colour='+colour)
+        print('paint='+str(paint)+', scientist='+str(scientist)+', colour='+str(colour))
     else:
         fav_paints = choose("Your favourite paints ?", paints, multichoice=True);
         fav_scientists = choose("Your favourite scientists ?", scientists, multichoice=True);

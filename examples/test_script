@@ -6,10 +6,23 @@
 #     This script is free software; you can redistribute it and/or      #
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
+use utf8;  # can't get utf8 strings to work, tried many combinations :-(
 eval "require './Term/Clui.pm'";
-if ($@) { eval "require '../Clui.pm'"; }
-if ($@) { eval "require 'Clui.pm'"; }
-if ($@) { die "can't find Clui.pm in this dir, parent dir, or INC path\n"; }
+if (!$@) {
+	warn "using ./Term/Clui.pm\n";
+} else {
+	eval "require '../Clui.pm'";
+	if (!$@) {
+		warn "using ../Clui.pm\n";
+	} else {
+		eval "require 'Clui.pm'";
+		if (!$@) {
+			warn "using ./Clui.pm\n";
+		} else {
+			die "can't find Clui.pm in this dir, parent dir, or INC path\n";
+		}
+	}
+}
 import Term::Clui;
 
 eval "require './Term/Clui/FileSelect.pm'";
@@ -24,7 +37,7 @@ my $paint = "";
 my $name = "";
 
 while (1) {
-	my $task = &choose ('Test which Clui.pm subroutine ?',
+	my $task = &choose('Test which Clui.pm subroutine ?',
 		'ask','choose','confirm','edit','view','select_file',
 	);
 	exit unless $task;
@@ -32,6 +45,7 @@ while (1) {
 }
 
 sub test_choose {
+	use utf8;
 	my @colours = ('Red','Orange','Black','Grey','Blue');
 	my @paints  = (
 	'Bizzare extremely long name that certainly will never occur on any real artist pallette',
@@ -54,10 +68,11 @@ sub test_choose {
 	'René Descartes', 'Willem de Sitter', 'Bruce DeWitt', 'Paul Dirac',
 	'Freeman Dyson', 'Arthur Stanley Eddington', 'Albert Einstein',
 	'Leonhard Euler', 'Hugh Everett', 'Michael Faraday', 'Pierre Fatou',
-	'Mitchell Feigenbaum', 'Pierre de Fermat', 'Enrico Fermi', 'Richard Feynman',
-	'Joseph Fraunhofer', 'Galileo Galilei', 'Evariste Galois', 'George Gamov',
-	'Carl Friedrich Gauss', 'Murray Gell-Mann', 'Kurt Gödel', 'Alan Guth',
-	'Stephen Hawking', 'Felix Hausdorff', 'Werner Heisenberg', 'Charles Hermite',
+	'Mitchell Feigenbaum', 'Pierre de Fermat', 'Enrico Fermi',
+	'Richard Feynman', 'Joseph Fraunhofer', 'Galileo Galilei',
+	'Evariste Galois', 'George Gamov', 'Carl Friedrich Gauss',
+	'Murray Gell-Mann', 'Kurt Gödel', 'Alan Guth', 'Stephen Hawking',
+	'Felix Hausdorff', 'Werner Heisenberg', 'Charles Hermite',
 	'Peter Higgs', 'David Hilbert', 'Fred Hoyle', 'Edwin Hubble',
 	'Christian Huygens', 'David Hilbert', 'Edwin Hubble', 'Pascual Jordan',
 	'Gaston Julia', 'Marc Kac', 'Theodor Kaluza', 'Stuart Kauffman',
@@ -82,12 +97,12 @@ sub test_choose {
 	'Shing-Tung Yau', 'Chen-Ning Yang', 'Hideki Yukawa', 'George Kingsley Zipf',
 	);
 
-	my $multi = &choose ('Mode ?', 'Single-choice', 'Multi-choice');
+	my $multi = &choose('Mode ?', 'Single-choice', 'Multi-choice');
 	return unless $multi;
 	if ($multi eq 'Single-choice') {
-		$paint = &choose ("Your favourite paint ?", @paints);
-		my $scientist = &choose ("Your favourite scientist ?", @scientists);
-		$colour = &choose (<<'EOT', @colours);
+		$paint = &choose("Your favourite paint ?", @paints);
+		my $scientist = &choose("Your favourite scientist ?", @scientists);
+		$colour = &choose(<<'EOT', @colours);
 Your favourite colour ?
 
 This tests how the 'choose' subroutine handles multi-line
@@ -106,7 +121,7 @@ EOT
 }
 
 sub test_confirm {
-	&confirm (<<EOT) || return;
+	&confirm(<<EOT) || return;
 OK to proceed with the test ?
 
 This step checks the 'confirm' subroutine and whether it handles
@@ -115,11 +130,11 @@ first line should disappear,  leaving the question and answer on
 the screen as a record of the dialogue.
 EOT
 
-	&confirm ('Did the text vanish except for the 1st line ?');
+	&confirm('Did the text vanish except for the 1st line ?');
 }
 
 sub test_ask {
-	my $string = &ask (<<EOT,);
+	my $string = &ask(<<EOT,);
 Enter a string :
 
 The point of this test is to check out the behaviour of &ask
@@ -131,17 +146,17 @@ backspace, left and right arrows, and ctrl-C (clear) ...
 EOT
 
 	my @colours = ('Red','Orange','Black','Grey','Blue');
-	$colour = &choose ('Your favourite colour ?', @colours);
+	$colour = &choose('Your favourite colour ?', @colours);
 	return unless $colour;
 	%names = (
 		Red=>'Fred', Orange=>'Solange', Black=>'Jack', Grey=>'May', Blue=>'Sue',
 	);
-	$name = &ask ("Choose a name which rhymes with $colour :", $names{$colour});
+	$name = &ask("Choose a name which rhymes with $colour :", $names{$colour});
 	warn "string=$string, name=$name\n";
 }
 
 sub test_edit {
-	$text = &edit ('Your limerick', <<EOT);
+	$text = &edit('Your limerick', <<EOT);
  There was a brave soul called $name,
  Whose favourite colour was $colour;
    But some $paint

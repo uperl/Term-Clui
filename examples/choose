@@ -80,20 +80,23 @@ then SpaceBar highlights choices additional to the one under the final Return.
 This program comes packaged with the Term::Clui module,
 in the C<examples/> directory.
 
-XXX if choose ARGV is intended but ARGV happens to be empty,
-choose hangs waiting for standard input :-(
-should there therefore be an explicit -a = ARGV option, or -f = Filter ?
-
 =head1 OPTIONS
 
 =over 3
 
-=item I<-m>
+=item B<-f>
 
-This offers multiple-choice, the equivalent of calling
-Term::Clui::choose in a list context.
+Causes I<choose> to work as a B<f>ilter (like I<grep>),
+so that the user chooses between lines from the standard input.
+(The default is that the user chooses between
+the 2nd and all subsequent arguments.)
 
-=item I<-v>
+=item B<-m>
+
+This offers multiple-choice; the equivalent of
+calling I<Term::Clui::choose> in a list context.
+
+=item B<-v>
 
 Prints version number.
 
@@ -101,6 +104,7 @@ Prints version number.
 
 =head1 CHANGES
 
+ 20090928  1.1  pod tidied up, and -f options documented
  20090927  1.0  first working version
 
 =head1 AUTHOR
