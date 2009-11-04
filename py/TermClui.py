@@ -1,6 +1,6 @@
-#! /usr/local/bin/python3.0
+#! /usr/local/bin/python3
 r'''
-a Python module offering a Command-Line User Interface
+a Python3 module offering a Command-Line User Interface
 
  from TermClui import *
  chosen = choose("A Title", a_list);  # single choice
@@ -14,7 +14,7 @@ a Python module offering a Command-Line User Interface
  edit(filename)
  view(title, text)  # if title is not a filename
  view(textfile)    # if textfile _is_ a filename
- edit(choose("Edit which file ?", list_of_files));
+ edit(choose("Edit which file ?", list_of_files))
  file  = select_file(Readable=True, TopDir="/home", FPat="*.html")
  files = select_file(Chdir=False, multichoice=True, FPat="*.mp3")
  os.chdir(select_file(Directory=True, Path=os.getcwd()))
@@ -44,13 +44,16 @@ dialogue, and will disappear when the user has given the answer.
 TermClui.py does not use curses (a whole-of-screen interface),
 it uses a small and portable subset of vt100 sequences.
 
+Download TermClui.py from  www.pjb.com.au/midi/free/TermClui.py
+and put it in your PYTHONPATH.  TermClui.py depends on Python3.
+
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.43
+Term::Clui and Term::Clui::FileSelect.  This is version 1.44
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.43'
+VERSION = '1.44'
 
 # ------------------------ vt100 stuff -------------------------
 
@@ -382,9 +385,10 @@ ask() returns the string when the user presses Enter.
         if _size_changed:
             _erase_lines(0)
             nol = _display_question(question)
-        if (c == _KEY_LEFT) and (i > 0):
-            i-=1
-            _left(1)
+        if c == _KEY_LEFT:
+            if i > 0:
+                i-=1
+                _left(1)
         elif (c == _KEY_RIGHT) and (i < n):
             _puts('x') if _silent else _puts(s_a[i])
             i+=1

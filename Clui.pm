@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.43';   # uses :encoding(utf8) in a utf8 environment
+$VERSION = '1.44';   # ask() handles left-arrow at start of string
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -255,7 +255,8 @@ sub ask { my ($question, $default) = @_;
 		if ($size_changed) {
 			&erase_lines(0); $nol = &display_question($question);
 		}
-		if ($c == $KEY_LEFT && $i > 0) { $i--; &left(1);
+		if ($c == $KEY_LEFT) {
+			if ($i > 0) { $i--; &left(1); }  # 1.44
 		} elsif ($c == $KEY_RIGHT) {
 			if ($i < $n) { &puts($silent ? "x" : $s[$i]); $i++; }
 		} elsif (($c eq "\cH") || ($c eq "\c?")) {
@@ -296,7 +297,7 @@ my @marked;
 my $HOME = $ENV{'HOME'} || $ENV{'LOGDIR'} || (getpwuid($<))[7];
 srand(time() ^ ($$+($$<15)));
 
-sub choose {  local ($question, @list) = @_;  # @list must be local
+sub choose {  my $question = shift; local @list = @_;  # @list must be local
 	# As from 1.22, allows multiple choice if called in array context
 
 	return unless @list;
@@ -917,7 +918,7 @@ Term::Clui.pm - Perl module offering a Command-Line User Interface
  &view($title, $text)  # if $title is not a filename
  &view($textfile)  # if $textfile _is_ a filename
 
- &edit (&choose ("Edit which file ?", grep (-T, readdir D)));
+ &edit(&choose("Edit which file ?", grep(-T, readdir D)));
 
 =head1 DESCRIPTION
 
@@ -945,7 +946,7 @@ and reverse) which are very portable.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.43
+This is Term::Clui.pm version 1.44
 
 =head1 WINDOW-SIZE
 
@@ -1127,8 +1128,8 @@ The whole default database mechanism can be disabled by
 I<CLUI_DIR = OFF> if you really want to :-(
 
 If either the LANG or the LC_TYPE environment variables
-contain the string I<utf8> (case insensitive), then I<&choose> and
-I<&inform> open I</dev/tty> with a I<uft8> encoding.
+contain the string I<utf8> or I<utf-8> (case insensitive),
+then I<&choose> and I<&inform> open I</dev/tty> with a I<utf8> encoding.
 
 I<Term::Clui> also consults the environment variables
 HOME, LOGDIR, EDITOR and PAGER, if they are set.
@@ -1151,8 +1152,10 @@ any of the system-config-* utilities, and much else.
 =item I<audio_stuff>
 
 This script offers an arrow-key-and-return interface integrating
-aplaymidi, cdrecord, cdda2wav, lame, mkisofs, muscript, normalize,
-mpg123, sndfile-play, timidity and so on, allowing audio files to be ripped,
+aplaymidi, cdrecord, cdda2wav, icedax, lame, mkisofs, muscript,
+normalize, normalize-audio,
+mpg123, sndfile-play, timidity, wodim and so on,
+allowing audio files to be ripped,
 burned, played, or converted between Muscript, MIDI, WAV and MP3 formats.
 
 =item I<login_shell>
