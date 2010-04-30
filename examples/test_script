@@ -6,15 +6,22 @@
 #     This script is free software; you can redistribute it and/or      #
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
-#use utf8;
+use utf8;
+use open ':locale';   # when was the open pragma introduced ?
+#my $EncodingString = q{};
+#if (($ENV{LANG} =~ /utf-?8/i) || ($ENV{LC_TYPE} =~ /utf-?8/i)) {
+#    $EncodingString = ':encoding(utf8)';
+#	binmode STDERR, $EncodingString;
+#	binmode STDOUT, $EncodingString;
+#}
 if (($ENV{LANG} =~ /utf-?8/i) || ($ENV{LC_TYPE} =~ /utf-?8/i)) {
-	$Brillouin = "L\x{00e9}on Brillouin";
-	$Delbrueck = "Max Delbr\x{00fc}ck";
-	$Descartes = "Ren\x{00e9} Descartes";
-	$Goedel    = "Kurt G\x{00f6}del";
-	$Levy      = "Paul L\x{00e9}vy";
-	$Poincare  = "Henri Poincar\x{00e9}";
-	$Schroedinger = "Erwin Schr\x{00f6}dinger";
+	$Brillouin = "Léon Brillouin";
+	$Delbrueck = "Max Delbrück";
+	$Descartes = "René Descartes";
+	$Goedel    = "Kurt Gödel";
+	$Levy      = "Paul Lévy";
+	$Poincare  = "Henri Poincaré";
+	$Schroedinger = "Erwin Schrödinger";
 } else {
 	$Brillouin = "L\x{e9}on Brillouin";
 	$Delbrueck = "Max Delbr\x{fc}ck";

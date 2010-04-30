@@ -23,10 +23,13 @@ my $sambalogd  = &first_existing('/usr/local/samba/var','/var/log/samba');
 my $sambaconfd = &first_existing('/usr/local/samba/lib','/etc/samba');
 my $tracd = &first_existing('/var/www/trac');
 my $svnd = &first_existing('/usr/local/svn');
+my $lshw = &first_existing('/usr/local/bin/lshw','/usr/bin/lshw');
 my $apacheconfd = &first_existing( '/usr/local/apache/conf',
  '/usr/local/apache2/conf','/etc/apache2','/etc/apache');
 my $dirvishconf = &first_existing('/etc/dirvish.conf',
  '/usr/local/dirvish/etc/master.conf','/etc/dirvish/master.conf');
+my $lsmod = &which('lsmod');
+my $modinfo = &which('modinfo');
 @tasks = &tasks();
 if (! @tasks) { die "Sorry, no administration tasks are available\n"; }
 while () {
@@ -38,6 +41,7 @@ while () {
    } elsif ($task eq "base-config")   { system "base-config";
    } elsif ($task eq "chpass")        { system "chpass";
    } elsif ($task eq "chkconfig")     { &chkconfig();
+   } elsif ($task eq "lshw")          { system "lshw | less";
    } elsif ($task eq "mii-tool")      { system "mii-tool";
    } elsif ($task eq "system-config") { &system_config();
    } elsif ($task eq "trac-admin")    { &trac_admin();
@@ -48,6 +52,7 @@ while () {
    } elsif ($task eq "Crontab")       { &crontab();
    } elsif ($task eq "Daemons")       { &daemons();
    } elsif ($task eq "Dirvish")       { &dirvish();
+   } elsif ($task eq "Modules")       { &modules();
    } elsif ($task eq "Network ports") { &ports();
    } elsif ($task eq "Samba")         { &samba();
    } elsif ($task eq "Squid")         { &squid();
@@ -61,7 +66,7 @@ sub tasks {
 	my @tasks;
 	if (! $>) {   # root stuff
    	foreach $f (
-			qw(adduser aptitude base-config chkconfig chpass mii-tool
+			qw(adduser aptitude base-config chkconfig chpass lshw mii-tool
 			sax sax2 trac-admin update-rc.d vipw visudo yast yast2)) {
 			if (&which($f)) { push @tasks, $f; }
 		}
@@ -88,6 +93,7 @@ sub tasks {
 		}
 	}
 	if (-e $dirvishconf) { push @tasks, 'Dirvish'; }
+	if ($lsmod && $modinfo) { push @tasks, 'Modules'; }
 	push @tasks, 'Network ports';
 	if (-d $squidlogd)   { push @tasks, 'Squid'; }
 	if (-d $sambaconfd)  { push @tasks, 'Samba'; }
@@ -255,12 +261,34 @@ sub dirvish {
 		&edit($task);
 	}
 }
+sub modules {
+	if (! open (P, "$lsmod |")) { &sorry("can't run $lsmod: $!"); return 0; }
+	my %mod2lsmod = ();
+	my $title = '';
+	while (<P>) {
+		if (/^([a-z]\w+)\s/) { $mod2lsmod{$1}=$_;
+		} elsif (/^[A-Z]/) { $title = $_;
+		}
+	}
+	close P;
+	my $mod = &choose('Which module ?', sort keys %mod2lsmod);
+	return(0) unless $mod;
+	print $title, $mod2lsmod{$mod}, "\n";
+	system "$modinfo $mod";
+}
 sub ports {
 	if (! open (P, "netstat -a |")) {
 		&sorry("can't run netstat -a: $!"); return 0;
 	}
 	my @lines; while (<P>) { if (/LISTEN|ESTABLISH/) { push @lines, $_; } }
 	close P;
+	if (! open (P, "iptables -L |")) {
+		&sorry("can't run iptables -L: $!");
+	} else {
+		push @lines, "\n", "Iptables:\n";
+		while (<P>) { s/         state/state/ ; push @lines, $_; }
+		close P;
+	}
 	&view ("Ports", join('', @lines));
 }
 sub daemons {

@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.44';   # ask() handles left-arrow at start of string
+$VERSION = '1.50';   # mouse works within choose()
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -28,6 +28,7 @@ if ($@) {
 	if ($@) { $have_Term_Size = 0; }
 }
 
+# use open ':locale';  # the open pragma was introduced in 5.8.6
 my $EncodingString = q{};
 if (($ENV{LANG} =~ /utf-?8/i) || ($ENV{LC_TYPE} =~ /utf-?8/i)) {
 	$EncodingString = ':encoding(utf8)';
@@ -44,37 +45,39 @@ $KEY_LEFT  = 0404;
 $KEY_RIGHT = 0405;
 $KEY_DOWN  = 0402;
 $KEY_ENTER = "\r";
-$KEY_ENTER .= q{};  # circumvent stupid bloody -w warning
 $KEY_PPAGE = 0523;
 $KEY_NPAGE = 0522;
 $KEY_BTAB  = 0541;
+my $AbsCursX = 0; my $AbsCursY = 0; my $TopRow = 0; my $CursorRow;
+my $LastEventWasPress = 0;  # in order to ignore left-over button-ups
 
 my $irow; my $icol;   # maintained by &puts, &up, &down, &left and &right
 sub puts   { my $s = join q{}, @_;
 	$irow += ($s =~ tr/\n/\n/);
 	if ($s =~ /\r\n?$/) { $icol = 0;
 	} else { $icol += length($s);
+my $x=length($s); debug("s=$s length=$x");
 	}
 	print TTY $s;
 }
 # could terminfo sgr0, bold, rev, cub1, cuu1, cuf1, cud1 ...
 sub attrset { my $attr = $_[$[];
 	if (! $attr) {
-		print TTY "\033[0m";
+		print TTY "\e[0m";
 	} else {
-		if ($attr & $A_BOLD)      { print TTY "\033[1m" };
-		if ($attr & $A_REVERSE)   { print TTY "\033[7m" };
-		if ($attr & $A_UNDERLINE) { print TTY "\033[4m" };
+		if ($attr & $A_BOLD)      { print TTY "\e[1m" };
+		if ($attr & $A_REVERSE)   { print TTY "\e[7m" };
+		if ($attr & $A_UNDERLINE) { print TTY "\e[4m" };
 	}
 }
 sub beep     { print TTY "\07"; }
-sub clear    { print TTY "\033[H\033[J"; }
-sub clrtoeol { print TTY "\033[K"; }
-sub black    { print TTY "\033[30m"; }
-sub red      { print TTY "\033[31m"; }
-sub green    { print TTY "\033[32m"; }
-sub blue     { print TTY "\033[34m"; }
-sub violet   { print TTY "\033[35m"; }
+sub clear    { print TTY "\e[H\e[J"; }
+sub clrtoeol { print TTY "\e[K"; }
+sub black    { print TTY "\e[30m"; }
+sub red      { print TTY "\e[31m"; }
+sub green    { print TTY "\e[32m"; }
+sub blue     { print TTY "\e[34m"; }
+sub violet   { print TTY "\e[35m"; }
 
 sub getc_wrapper { my $timeout = 0 + $_[$[];
 	if ($have_Term_ReadKey) {
@@ -92,10 +95,10 @@ sub getc_wrapper { my $timeout = 0 + $_[$[];
 
 sub getch {
 	my $c = getc_wrapper(0);
-	if ($c eq "\033") {
+	if ($c eq "\e") {
 		$c = getc_wrapper(0.10);
 
-		if (! defined $c) { return("\033"); }
+		if (! defined $c) { return("\e"); }
 		if ($c eq 'A') { return($KEY_UP); }
 		if ($c eq 'B') { return($KEY_DOWN); }
 		if ($c eq 'C') { return($KEY_RIGHT); }
@@ -109,36 +112,77 @@ sub getch {
 			if ($c eq 'B') { return($KEY_DOWN); }
 			if ($c eq 'C') { return($KEY_RIGHT); }
 			if ($c eq 'D') { return($KEY_LEFT); }
-			if ($c eq '5') { getc_wrapper(0); return($KEY_PPAGE); }
-			if ($c eq '6') { getc_wrapper(0); return($KEY_NPAGE); }
+            if ($c eq 'M') {   # mouse report - we must be in BYTES !
+				# http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
+				my $event_type = ord(getc_wrapper(0))-32;
+				my $x = ord(getc_wrapper(0))-32;
+				my $y = ord(getc_wrapper(0))-32;
+				# my $shift   = $event_type & 0x04; # used by wm
+				# my $meta	= $event_type & 0x08;   # used by wm
+				# my $control = $event_type & 0x10; # used by xterm
+				my $button_drag = ($event_type & 0x20) >> 5;
+				my $button_pressed;
+				my $low3bits = $event_type & 0x03;
+				if ($low3bits == 0x03) {
+					$button_pressed = 0;
+				} else {  # button 4 means wheel-up, button 5 means wheel-down
+					if ($event_type & 0x40) { $button_pressed = $low3bits + 4;
+					} else { $button_pressed = $low3bits + 1;
+					}
+				}
+				return handle_mouse($x,$y,$button_pressed,$button_drag)
+				 || getch();
+			}
+			if ($c =~ /\d/) { my $c1 = getc_wrapper(0);
+				if ($c1 eq '~') {
+					if ($c eq '5') { return($KEY_PPAGE);
+					} elsif ($c eq '6') { return($KEY_NPAGE);
+					}
+				} else {   # cursor-position report, response to \e[6n
+					$AbsCursY = 0 + $c;
+					while (1) {
+						last if $c1 eq ';';
+						$AbsCursY = 10*$AbsCursY + $c1;
+						# debug("c1=$c1 AbsCursY=$AbsCursY");
+						$c1 = getc(TTYIN);
+					}
+					$AbsCursX = 0;
+					while (1) {
+						$c1 = getc(TTYIN);
+						last if $c1 eq 'R';
+						$AbsCursX = 10*$AbsCursX + $c1;
+					}
+					return getch();
+				}
+            }
 			if ($c eq 'Z') { return($KEY_BTAB); }
 			return($c);
 		}
 		return($c);
-	} elsif ($c eq ord(0217)) {
-		$c = getc_wrapper(0);
-		if ($c eq 'A') { return($KEY_UP); }
-		if ($c eq 'B') { return($KEY_DOWN); }
-		if ($c eq 'C') { return($KEY_RIGHT); }
-		if ($c eq 'D') { return($KEY_LEFT); }
-		return($c);
-	} elsif ($c eq ord(0233)) {
-		$c = getc_wrapper(0);
-		if ($c eq 'A') { return($KEY_UP); }
-		if ($c eq 'B') { return($KEY_DOWN); }
-		if ($c eq 'C') { return($KEY_RIGHT); }
-		if ($c eq 'D') { return($KEY_LEFT); }
-		if ($c eq '5') { getc_wrapper(0); return($KEY_PPAGE); }
-		if ($c eq '6') { getc_wrapper(0); return($KEY_NPAGE); }
-		if ($c eq 'Z') { return($KEY_BTAB); }
-		return($c);
+	#} elsif ($c eq ord(0217)) {  # 1.50 BUG what?? never gets here...
+	#	$c = getc_wrapper(0);
+	#	if ($c eq 'A') { return($KEY_UP); }
+	#	if ($c eq 'B') { return($KEY_DOWN); }
+	#	if ($c eq 'C') { return($KEY_RIGHT); }
+	#	if ($c eq 'D') { return($KEY_LEFT); }
+	#	return($c);
+	#} elsif ($c eq ord(0233)) {  # 1.50 BUG what?? never gets here...
+	#	$c = getc_wrapper(0);
+	#	if ($c eq 'A') { return($KEY_UP); }
+	#	if ($c eq 'B') { return($KEY_DOWN); }
+	#	if ($c eq 'C') { return($KEY_RIGHT); }
+	#	if ($c eq 'D') { return($KEY_LEFT); }
+	#	if ($c eq '5') { getc_wrapper(0); return($KEY_PPAGE); }
+	#	if ($c eq '6') { getc_wrapper(0); return($KEY_NPAGE); }
+	#	if ($c eq 'Z') { return($KEY_BTAB); }
+	#	return($c);
 	} else {
 		return($c);
 	}
 }
 sub up    {
 	# if ($_[$[] < 0) { &down(0 - $_[$[]); return; }
-	print TTY "\033[A" x $_[$[]; $irow -= $_[$[];
+	print TTY "\e[A" x $_[$[]; $irow -= $_[$[];
 }
 sub down  {
 	# if ($_[$[] < 0) { &up(0 - $_[$[]); return; }
@@ -146,11 +190,11 @@ sub down  {
 }
 sub right {
 	# if ($_[$[] < 0) { &left(0 - $_[$[]); return; }
-	print TTY "\033[C" x $_[$[]; $icol += $_[$[];
+	print TTY "\e[C" x $_[$[]; $icol += $_[$[];
 }
 sub left  {
 	# if ($_[$[] < 0) { &right(0 - $_[$[]); return; }
-	print TTY "\033[D" x $_[$[]; $icol -= $_[$[];
+	print TTY "\e[D" x $_[$[]; $icol -= $_[$[];
 }
 sub goto { my $newcol = shift; my $newrow = shift;
 	if ($newcol == 0) { print TTY "\r" ; $icol = 0;
@@ -161,18 +205,63 @@ sub goto { my $newcol = shift; my $newrow = shift;
 	} elsif ($newrow < $irow) { &up($irow-$newrow);
 	}
 }
-# sub move { my ($ix,$iy) = @_; printf TTY "\033[%d;%dH",$iy+1,$ix+1; }
+# sub move { my ($ix,$iy) = @_; printf TTY "\e[%d;%dH",$iy+1,$ix+1; }
 
-my $initscr_already_run = 0; my $stty = q{};
+my $InitscrAlreadyRun = 0;
+my $IsMouseMode = 0;
+my $WasMouseMode = 0;
+my $Stty = q{};
 
-sub initscr {
-	if ($initscr_already_run) {
-		$icol = 0; $irow = 0; $initscr_already_run++; return;
+sub enter_mouse_mode {   # 1.50
+	if ($IsMouseMode) {
+		warn "enter_mouse_mode but already IsMouseMode\r\n"; return 1 ;
+	}
+	if ($EncodingString) {
+		close TTYIN;
+		open(TTYIN, "<:bytes", '/dev/tty')
+			 || (warn "Can't read /dev/tty: $!\n", return 0);
+	}
+	print TTY "\e[?1003h";   # sets   SET_ANY_EVENT_MOUSE  mode
+	$IsMouseMode = 1;
+	return 1;
+}
+sub leave_mouse_mode {   # 1.50
+	if (!$IsMouseMode) {
+		warn "leave_mouse_mode but not IsMouseMode\r\n"; return 1 ;
+	}
+	if ($EncodingString) {
+		close TTYIN;
+		open(TTYIN, "<$EncodingString", '/dev/tty')
+ 		 || (warn "Can't read /dev/tty: $!\n", return 0);
+	}
+	print TTY "\e[?1003l";   # cancels SET_ANY_EVENT_MOUSE mode
+	$IsMouseMode = 0;
+	return 1;
+}
+
+sub initscr {  my $mouse_mode = $_[$[];  # needed for mouse-handling
+	if ($InitscrAlreadyRun) {
+		$InitscrAlreadyRun++;
+		if (!$mouse_mode and $IsMouseMode) {
+			leave_mouse_mode() or return 0;
+		} elsif ($mouse_mode and !$IsMouseMode) {
+			enter_mouse_mode() or return 0;
+		}
+		$WasMouseMode = $IsMouseMode;
+		$icol = 0; $irow = 0;
+		return;
 	}
 	open(TTY, ">$EncodingString", '/dev/tty')   # 1.43
 	 || (warn "Can't write /dev/tty: $!\n", return 0);
-	if (!$have_Term_ReadKey) { $stty = `stty -g`; chop $stty; }
-	open(TTYIN, "<$EncodingString", '/dev/tty')   # 1.43
+	if (!$have_Term_ReadKey) { $Stty = `stty -g`; chop $Stty; }
+	my $encoding_string;
+	if ($mouse_mode) {
+		$IsMouseMode = 1; $encoding_string = ':bytes';
+		print TTY "\e[?1003h";   # sets  SET_ANY_EVENT_MOUSE  mode
+	} else {
+		$IsMouseMode = 0; $encoding_string = $EncodingString;
+	}
+	open(TTYIN, "<$encoding_string", '/dev/tty')
 	 || (warn "Can't read /dev/tty: $!\n", return 0);
 
 	if ($have_Term_ReadKey) {
@@ -185,21 +274,27 @@ sub initscr {
 
 	select((select(TTY), $| = 1)[$[]); print TTY q{};
 	$rin = q{}; vec($rin, fileno(TTYIN), 1) = 1;
-	$icol = 0; $irow = 0; $initscr_already_run = 1;
+	$icol = 0; $irow = 0; $InitscrAlreadyRun = 1;
 }
 sub endwin {
-	print TTY "\033[0m";
-	if ($initscr_already_run > 1) { $initscr_already_run--; return; }
+	print TTY "\e[0m";
+	if ($InitscrAlreadyRun > 1) {
+		if      ($IsMouseMode and !$WasMouseMode) { leave_mouse_mode();
+		} elsif (!$IsMouseMode and $WasMouseMode) { enter_mouse_mode();
+		}
+		$InitscrAlreadyRun--; return;
+	}
+	print TTY "\e[?1003l";   $IsMouseMode = 0;
 	if ($have_Term_ReadKey) {
 		Term::ReadKey::ReadMode('restore', *TTYIN);
 		close TTY; close TTYIN;
 	} else {
 		close TTY; close TTYIN;
-		if ($^O =~ /^FreeBSD$/i) { system("stty $stty </dev/tty") if $stty;
-		} else { system("stty $stty </dev/tty >/dev/tty") if $stty;
+		if ($^O =~ /^FreeBSD$/i) { system("stty $Stty </dev/tty") if $Stty;
+		} else { system("stty $Stty </dev/tty >/dev/tty") if $Stty;
 		}
 	}
-	$initscr_already_run = 0;
+	$InitscrAlreadyRun = 0;
 }
 
 # ----------------------- size handling ----------------------
@@ -272,13 +367,13 @@ sub ask { my ($question, $default) = @_;
 		} elsif ($c eq "\cL") {  # redraw ...
 		#} elsif ($c > 255) { &beep();
 		#} elsif ($c =~ /^[\040-\376]$/) {
-		} else {  # 1.43
+		} elsif (ord($c) > 32) {  # 1.50
 			splice(@s, $i, 0, $c);
 			&puts($silent ? "x" : $c);
 			$n++; $i++;
 			foreach $j ($i .. $n) { &puts($s[$j]); }
 			&clrtoeol();  &left($n-$i);
-		#} else { &beep();
+		} else { &beep();
 		}
 	}
 	&endwin(); $silent = q{}; return join("", @s);
@@ -312,7 +407,7 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 	$choice = &get_default($firstline);
 	# If wantarray ? Is remembering multiple choices safe ?
 
-	&initscr();
+	&initscr('mouse_mode');
 	&size_and_layout(0);
 	@otherlines = &fmt($otherlines);
 	$notherlines = scalar @otherlines;
@@ -338,6 +433,9 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 		}
 	}
 	&wr_screen();
+	# the cursor is now on this_cell, not on the question
+	print TTY "\e[6n";  # terminfo u7, will set $AbsCursX,$AbsCursY
+	$CursorRow = $irow[$this_cell];  # global, needed by handle_mouse
 
 	while (1) {
 		$c = &getch();
@@ -463,12 +561,12 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 		} elsif ($c eq " ") {
 			if (wantarray) {
 				$marked[$this_cell] = !$marked[$this_cell];
-				if ($this_cell < $#list) {
-					$this_cell++;
-					&wr_cell($this_cell-1); &wr_cell($this_cell); 
-				}
-			} elsif ($this_cell < $#list) {
-				$this_cell++; &wr_cell($this_cell-1); &wr_cell($this_cell); 
+				#if ($this_cell < $#list) {
+					#  $this_cell++; &wr_cell($this_cell-1); # 1.50
+				&wr_cell($this_cell); 
+				#}
+			#} elsif ($this_cell < $#list) {
+			#	$this_cell++; &wr_cell($this_cell-1); &wr_cell($this_cell); 
 			}
 		}
 	}
@@ -524,12 +622,15 @@ sub narrow_the_search { my @biglist = @_;
 	my $nchoices = scalar @_;
 	my $n; my $i; my @s; my $s; my @list = @biglist;
 	$clue_has_been_given = 1;
+	leave_mouse_mode();
 	&ask_for_clue($nchoices, $i, $s);
 	while (1) {
 		$c = &getch();
 		if ($size_changed) {
 			&size_and_layout(0);
-			if ($nrows < $maxrows) { &erase_lines(1); return @list; }
+			if ($nrows < $maxrows) {
+				&erase_lines(1); enter_mouse_mode(); return @list;
+			}
 		}
 		if ($c == $KEY_LEFT && $i > 0) { $i--; &left(1); next;
 		} elsif ($c == $KEY_RIGHT) {
@@ -542,15 +643,14 @@ sub narrow_the_search { my @biglist = @_;
 			}
 		} elsif ($c eq "\cC" || $c eq "\cX" || $c eq "\cD") {  # clear ...
 			if (! @s) {   # 20070305 ?
-				$clue_has_been_given = 0; &erase_lines(1); return ();
+				$clue_has_been_given = 0; &erase_lines(1); 
+				enter_mouse_mode(); return ();
 			}
 			&left($i); $i = 0; $n = 0; @s = (); &clrtoeol();
 		} elsif ($c eq "\cB") { &left($i); $i = 0; next;
 		} elsif ($c eq "\cE") { &right($n-$i); $i = $n; next;
 		} elsif ($c eq "\cL") {
-
-		} elsif ($c > 255) { &beep();
-		} elsif ($nchoices && $c =~ /^[\040-\376]$/) {
+		} elsif (ord($c) > 32) {
 			splice(@s, $i, 0, $c);
 			$n++; $i++; &puts($c);
 			foreach $j ($i..$n) { &puts($s[$j]); } &clrtoeol();  &left($n-$i);
@@ -562,7 +662,8 @@ sub narrow_the_search { my @biglist = @_;
 		$nchoices = scalar @list;
 		$nrows = &layout(@list);
 		if ($nchoices==1 || ($nchoices && ($nrows<$maxrows))) {
-			&puts("\r"); &clrtoeol(); &up(1); &clrtoeol(); return @list;
+			&puts("\r"); &clrtoeol(); &up(1); &clrtoeol();
+			enter_mouse_mode(); return @list;
 		}
 		&ask_for_clue($nchoices, $i, $s);
 	}
@@ -633,6 +734,42 @@ sub dbm_file {
 	}
 	mkdir ($db_dir,0750);
 	return "$db_dir/choices";
+}
+sub handle_mouse { my ($x, $y, $button_pressed, $button_drag) = @_;  # 1.50 
+	$TopRow = $AbsCursY - $CursorRow;
+	if ($LastEventWasPress) { $LastEventWasPress = 0; return(''); }
+	return('') unless $y >= $TopRow;
+	my $mouse_row = $y - $TopRow;
+	my $mouse_col = $x - 1;
+	# debug("x=$x y=$y TopRow=$TopRow mouse_row=$mouse_row");
+	# debug("button_pressed=$button_pressed button_drag=$button_drag");
+	my $found = 0;
+	my $i = $[; while ($i < @irow) {
+		if ($irow[$i] == $mouse_row) {
+			# debug("list[$i]=$list[$i] is the right row");
+			if ($icol[$i] < $mouse_col
+			 and ($icol[$i]+length($list[$i]) >= $mouse_col)) {
+				$found = 1; last;
+			}
+			last if $irow[$i] > $mouse_row;
+		}
+		$i += 1;
+	}
+	return unless $found;
+	# if xterm doesn't receive a button-up event it thinks it's dragging
+	my $return_char = q{};
+	if ($button_pressed == 1 and !$button_drag) {
+		$LastEventWasPress = 1;
+		$return_char = $KEY_ENTER;
+	} elsif ($button_pressed == 3 and !$button_drag) {
+		$LastEventWasPress = 1;
+		$return_char = q{ };
+	}
+	if ($i != $this_cell) {
+		my $t = $this_cell; $this_cell = $i;
+		&wr_cell($t); &wr_cell($this_cell); 
+	}
+	return $return_char;
 }
 
 # ----------------------- confirm stuff -------------------------
@@ -885,7 +1022,7 @@ sub fmt { my $text = shift; my %options = @_;
 sub back_up {
 	open(TTY, '>', '/dev/tty')   # 1.43
 	 || (warn "Can't write /dev/tty: $!\n", return 0);
-	print TTY "\r\033[K\033[A\033[K";
+	print TTY "\r\e[K\e[A\e[K";
 	close TTY;
 }
 1;
@@ -901,24 +1038,24 @@ Term::Clui.pm - Perl module offering a Command-Line User Interface
 =head1 SYNOPSIS
 
  use Term::Clui;
- $chosen = &choose("A Title", @a_list);  # single choice
- @chosen = &choose("A Title", @a_list);  # multiple choice
+ $chosen = choose("A Title", @a_list);  # single choice
+ @chosen = choose("A Title", @a_list);  # multiple choice
  # multi-line question-texts are possible...
- $x = &choose("Which ?\n(Arrow-keys and Return)", @w);
+ $x = choose("Which ?\n(Mouse, or Arrow-keys and Return)", @w);
 
- if (&confirm($text)) { &do_something(); };
+ if (confirm($text)) { do_something(); };
 
- $answer = &ask($question);
- $answer = &ask($question,$suggestion);
- $password = &ask_password("Enter password : ");
+ $answer = ask($question);
+ $answer = ask($question,$suggestion);
+ $password = ask_password("Enter password : ");
 
- $newtext = &edit($title, $oldtext);
- &edit($filename);
+ $newtext = edit($title, $oldtext);
+ edit($filename);
 
- &view($title, $text)  # if $title is not a filename
- &view($textfile)  # if $textfile _is_ a filename
+ view($title, $text)  # if $title is not a filename
+ view($textfile)  # if $textfile _is_ a filename
 
- &edit(&choose("Edit which file ?", grep(-T, readdir D)));
+ edit(choose("Edit which file ?", grep(-T, readdir D)));
 
 =head1 DESCRIPTION
 
@@ -933,20 +1070,30 @@ This user interface can therefore be intermixed with
 standard applications which write to STDOUT or STDERR,
 such as I<make>, I<pgp>, I<rcs> etc.
 
-For the user, I<&choose> uses arrow keys (or hjkl) and Return or q;
-also SpaceBar for multiple choices.
-I<&confirm> expects y, Y, n or N.
+For the user, I<choose()> uses either
+(since 1.50) the mouse;
+or arrow keys (or hjkl) and Return;
+also B<q> to quit, and SpaceBar to highlight multiple choices.
+I<confirm()> expects y, Y, n or N.
 In general, ctrl-L redraws the (currently active bit of the) screen.
-I<&edit> and I<&view> use the default EDITOR and PAGER if possible.  
+I<edit()> and I<view()> use the default EDITOR and PAGER if possible.  
 
 It's fast, simple, and has few external dependencies.
 It doesn't use I<curses> (which is a whole-of-screen interface);
 it uses a small subset of vt100 sequences (up down left right normal
-and reverse) which are very portable.
+and reverse) which are very portable,
+and also (since 1.50) the I<SET_ANY_EVENT_MOUSE> and I<kmous> (terminfo)
+sequences,
+which are supported by all I<xterm>, I<rxvt>, I<konsole>, I<screen>,
+I<linux>, I<gnome> and I<putty> terminals.
 
 There is an associated file selector, Term::Clui::FileSelect
 
-This is Term::Clui.pm version 1.44
+There is an equivalent Python3 module,
+with (as far as possible) the same calling interface, at
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.50/py/TermClui.py
+
+This is Term::Clui.pm version 1.50
 
 =head1 WINDOW-SIZE
 
@@ -964,7 +1111,7 @@ individual words which will not fit onto one line are truncated,
 and successive blank lines are collapsed into one.
 If the question will not fit within the available rows, it is truncated.
 
-If the available choice items in a I<&choose> overflow the screen,
+If the available choice items in a I<choose()> overflow the screen,
 the user is asked to enter "clue" letters,
 and as soon as the items matching them will fit onto the screen
 they are displayed as a choice.
@@ -1017,8 +1164,8 @@ that the user might fail to notice some of the highlit items
 
 The database I<~/.clui_dir/choices> or I<$ENV{CLUI_DIR}/choices>
 is available to be read or written if lower-level manipulation is needed,
-and the I<EXPORT_OK> routines I<&get_default>($question) and
-I<&set_default>($question, $choice) should be used for this purpose,
+and the I<EXPORT_OK> routines I<get_default>($question) and
+I<set_default>($question, $choice) should be used for this purpose,
 as they handle DBM's problem with concurrent accesses.
 The whole default database mechanism can be disabled by
 I<CLUI_DIR=OFF> if you really want to :-(
@@ -1122,14 +1269,14 @@ if not, it tries I<tput> before guessing 80x24.
 =head1 ENVIRONMENT
 
 The environment variable I<CLUI_DIR> can be used (by programmer or user)
-to override I<~/.clui_dir> as the directory in which I<&choose> keeps
+to override I<~/.clui_dir> as the directory in which I<choose()> keeps
 its database of previous choices.
 The whole default database mechanism can be disabled by
 I<CLUI_DIR = OFF> if you really want to :-(
 
 If either the LANG or the LC_TYPE environment variables
 contain the string I<utf8> or I<utf-8> (case insensitive),
-then I<&choose> and I<&inform> open I</dev/tty> with a I<utf8> encoding.
+then I<choose()> and I<inform()> open I</dev/tty> with a I<utf8> encoding.
 
 I<Term::Clui> also consults the environment variables
 HOME, LOGDIR, EDITOR and PAGER, if they are set.
@@ -1191,7 +1338,16 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 =head1 SEE ALSO
 
-Term::Clui::FileSelect , Term::ReadKey , Term::Size ,
-http://www.pjb.com.au/ , perl(1), http://www.cpan.org/SITES.html
+ Term::Clui::FileSelect
+ Term::ReadKey
+ Term::Size
+ http://www.pjb.com.au/
+ http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
+ perl(1)
+ http://www.cpan.org/SITES.html
+
+There is an equivalent Python3 module,
+with (as far as possible) the same calling interface, at
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.50/py/TermClui.py
 
 =cut

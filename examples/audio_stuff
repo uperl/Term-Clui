@@ -47,7 +47,7 @@ my $eject        = which('eject');
 my $festival     = which('festival');
 my $lame         = which('lame');
 my $man          = which('man');
-my $mkisofs      = which('mkisofs');
+my $mkisofs      = which('mkisofs') || which ('genisoimage');
 my $mpg123       = which('mpg123');
 my $mplayer      = which('mplayer');
 my $normalize    = which('normalize') || which ('normalize-audio');
@@ -55,6 +55,7 @@ my $play         = which('play');   # comes with sox
 my $rec          = which('rec');    # comes with sox
 my $sox          = which('sox');
 my $sndfile_play = which('sndfile-play');
+my $startBristol = which('startBristol');
 my $su           = which('su');
 my $timidity     = which('timidity');
 my $toolame      = which('toolame') || which('twolame');
@@ -76,6 +77,7 @@ while (1) {
 	} elsif ($task eq 'convert MIDI->WAV')  { mid2wav();
 	} elsif ($task eq 'convert MIDI->MP3')  { mid2mp3();
 	} elsif ($task eq 'copy audio CD')      { copy_cd();
+	} elsif ($task eq 'copy video DVD')     { copy_dvd();
 	} elsif ($task eq 'decode MP3->WAV')    { mp32wav();
 	} elsif ($task eq 'edit Makefile')      { edit('Makefile');
 	} elsif ($task eq 'encode WAV->MP2')    { wav2mp2();
@@ -86,6 +88,7 @@ while (1) {
 	} elsif ($task eq 'record Keyboard->MIDI') { kbd2mid();
 	} elsif ($task eq 'rip AudioCD->WAV')   { rip_wav();
 	} elsif ($task eq 'rip MP3CD->MP3')     { rip_mp3();
+	} elsif ($task eq 'run a Bristol synth'){ bristol();
 	} elsif ($task eq 'run alsamixer')      { alsamixer();
 	} elsif ($task eq 'run Make')           { system 'make';
 	}
@@ -96,6 +99,34 @@ exit 0;
 sub alsamixer {
 	if (! $alsamixer) { sorry("you need to install alsamixer."); return; }
 	system $alsamixer;
+}
+sub bristol {
+	if (! $startBristol) { sorry("you need to install Bristol."); return; }
+	if (! open(P, "$startBristol -v -h |")) {
+		sorry("can't run $startBristol -v -h: $!"); return;
+	}
+	my $is_in_emulations = 0;
+	my %long2short = ();
+	while (<P>) {
+		if (/Emulation:/) { $is_in_emulations = 1; next; }
+		if (!$is_in_emulations) { next; }
+		if ($is_in_emulations and /Synthesiser:/) { last; }
+		if (/^\s+-(\w+)\s+-\s(\w.*)$/) { $long2short{$2} = $1; }
+	}
+	close P;
+	my $long = choose("which synth emulation ?", sort keys %long2short);
+	return unless $long;
+	my $out_file = ask("save output to wav file (return = don't save) ?");
+	if (! $out_file) {
+		system "$startBristol -$long2short{$long}";
+	} else {
+		$out_file =~ s/\.WAV$//i;
+		system "$startBristol -$long2short{$long} -o $out_file.raw";
+		if (!$sox) {
+			sorry("you need to install sox to convert raw to wav."); return;
+		}
+		system "$sox -c 2 -s -r 44100 -2 $out_file.raw $out_file.wav";
+	}
 }
 sub burn_wav {
 	if (!$cdrecord) {sorry("you need to install cdrecord or wodim."); return;}
@@ -110,7 +141,9 @@ sub burn_wav {
 	if ($eject) { system $eject; }
 }
 sub burn_mp3 {
-	if (! $mkisofs)  { sorry("you need to install mkisofs.");  return; }
+	if (! $mkisofs)  {
+		sorry("you need to install mkisofs or genisoimage.");  return;
+	}
 	if (!$cdrecord) {sorry("you need to install cdrecord or wodim."); return;}
 	sorry("burn_mp3 isn't implemented yet");
 }
@@ -141,6 +174,80 @@ sub copy_cd {
 	chdir "$oldir";
 	system "rm -rf $tmpdir";
 }
+sub copy_dvd {
+	my $ok = 1;
+	if (!$mkisofs){sorry("you need to install mkisofs or genisoimage.");$ok=0;}
+	if (!$cdrecord) {sorry("you need to install cdrecord or wodim.");  $ok=0;}
+	if (! -e '/dev/cdrom') { sorry("can't find /dev/cdrom"); $ok = 0;
+	} elsif (! -w '/dev/cdrom') { sorry("can't write to /dev/cdrom"); $ok=0;
+	}
+	my $tmpfile = "/tmp/dvd_$$";
+	my $tmp_mnt = "/tmp/mnt_$$";
+	if (! mkdir $tmp_mnt) { sorry("can't mkdir $tmp_mnt: $!"); $ok=0; }
+	return unless $ok;
+	if ($eject) { system $eject; }
+	speak("insert the DVD into the drive, and press Return");
+	ask("insert the DVD into drive, and press Return...");
+	# system "mount -t iso9660 -o ro,map=off /dev/cdrom $tmp_mnt";
+	# should sleep, try, sleep, retry up to about 15 sec ...
+	my $return_code;
+	foreach (1..5) {
+		sleep 2;
+		$return_code = system "mount -t udf -o ro /dev/cdrom $tmp_mnt";
+		last unless $return_code;
+		sleep 2;
+	}
+	if ($return_code) { sorry("couldn't mount the DVD"); return 0; }
+	if (! -d "$tmp_mnt/VIDEO_TS" and ! -d "$tmp_mnt/video_ts") {
+		sorry("not a video DVD; can't see a /VIDEO_TS directory");
+		system "ls -lR $tmp_mnt ; umount $tmp_mnt";
+		if (! rmdir $tmp_mnt) { warn "can't rmdir $tmp_mnt: $!\n"; }
+		return 0;
+	}
+	system "ls -lR $tmp_mnt/*";
+	# suppress line-feeds in the progress-bar (on stderr) ...
+	system "$mkisofs -gui -r -J -T -dvd-video -allow-limited-size"
+	 ." -V Video_DVD -o $tmpfile $tmp_mnt 2>&1 | perl -pe 's/\$/\\e[K\\e[A/'";
+	system "umount $tmp_mnt";
+	print "\n";
+	if ($eject) { system $eject; }
+	if (! rmdir $tmp_mnt) { warn "can't rmdir $tmp_mnt: $!\n"; }
+	# could mount -o loop $tmpfile and check it's OK ...
+	while (1) {
+		speak("insert a blank D V D into the drive, and press Return");
+		ask("insert blank DVD into drive and press Return...");
+		# suppress line-feeds in the progress-bar (on stderr) ...
+		# should sleep, try, sleep, retry up to about 15 sec ...
+		system "growisofs -dvd-compat -Z /dev/cdrom=$tmpfile"
+		 . "  2>&1 | perl -pe 's/\$/\\e[K\\e[A/'";
+		if ($eject) { system $eject; }
+		speak("finished copying D V D");
+		last unless confirm "do you want to write that to another DVD ?";
+	}
+	if (!unlink $tmpfile) { warn "can't unlink $tmpfile: $!\n"; }
+}
+sub dvd_size {
+	my $mediainfo = which('dvd+rw-mediainfo');
+	if (!$mediainfo) {
+		# could try some other program ?
+		sorry('you should install dvd+rw-mediainfo'); return undef;
+	}
+	my $dev = 'dev/cdrom';
+	my $size = undef;
+	foreach (1..5) {
+		sleep 2;
+		if (! open(P, "$mediainfo $dev 2>&1 |")) {
+			sorry("can't run $mediainfo $dev"); return undef;
+		}
+		while (<P>) { if (/Legacy lead-out.+=(\d+)$/) { $size = 0+$1; } }
+		close P;
+		if ($size) { return $size; }
+		sleep 2;
+	}
+	sorry("no dvd media present in $dev");
+	return undef;
+}
+
 sub speak {
 	if (!$festival) { return; }
 	if (!@_) { return; }
@@ -321,7 +428,7 @@ sub audio2wav {
 	}
 	# could offer options, like gain, compand, autostart on signal...
 	# must convert to 44100 Hz :-)
-	system "$rec $file";
+	system "$rec -r 44100 -c 2 $file";
 }
 sub midi_in_port {
 	if (! $aconnect) { sorry("you need to install aconnect."); return; }
@@ -329,7 +436,7 @@ sub midi_in_port {
 	my $major; my $inport; my $outport;
 	while (<P>) {
 		if (/^client\s*(\d+:)/) {  $major = $1;
-		} elsif (/^\s+(\d)\s+'(.*)'/) {
+		} elsif ($major>0 and /^\s+(\d)\s+'(.*)'/) {
 			my $minor = $1; my $device = $2; $device =~ s/\s+$//;
 			$inport2device{"$major$minor"} = $device;
 			$device2inport{$device} = "$major$minor";
@@ -337,7 +444,6 @@ sub midi_in_port {
 	}
 	close P;
 	my @indevices = sort keys %device2inport;
-	my $indevices;
 	my $inport;
 	if (!@indevices) {
 		sorry("aconnect can't see any midi input devices."); return;
@@ -345,7 +451,8 @@ sub midi_in_port {
 		inform("using MIDI-input-port $indevices[$[]");
 		$inport = $device2inport{$indevices[$[]};
 	} else {
-		$inport = $device2inport{choose('From which device ?',@indevices)};
+		$inport
+		 = $device2inport{choose('connect from which device ?',@indevices)};
 	}
 	return $inport;
 }
@@ -354,7 +461,7 @@ sub midi_out_port {
 	if (!open(P,"$aconnect -o |")) {die "can't run $aconnect -o: $!\n";}
 	while (<P>) {
 		if (/^client\s*(\d+:)/) {  $major = $1;
-		} elsif (/^\s+(\d)\s+'(.*)'/) {
+		} elsif ($major>0 and /^\s+(\d)\s+'(.*)'/) {
 			my $minor = $1; my $device = $2; $device =~ s/\s+$//;
 			$outport2device{"$major$minor"} = $device;
 			$device2outport{$device} = "$major$minor";
@@ -362,7 +469,6 @@ sub midi_out_port {
 	}
 	close P;
 	my @outdevices = sort keys %device2outport;
-	my $outdevices;
 	my $outport;
 	if (!@outdevices) {
 		sorry("aconnect can't see any midi output devices."); return;
@@ -370,11 +476,56 @@ sub midi_out_port {
 		inform("using MIDI-output-port $outdevices[$[]");
 		$outport = $device2outport{$outdevices[$[]};
 	} else {
-		$outport = $device2outport{choose('To which device ?',@outdevices)};
+		$outport
+		 = $device2outport{choose('connect to which device ?',@outdevices)};
 	}
 	return $outport;
 }
 sub connect_midi_ports {
+	if (! $aconnect) { sorry("you need to install aconnect."); return; }
+	if (!open(P,"$aconnect -ol |")) {die "can't run $aconnect -ol: $!\n";}
+	my $major  = -1;
+	my %port2device = ();
+	my %device2port = ();
+	my @connections = ();
+	my $device = '';
+	while (<P>) {
+		if (/^client\s*(\d+):/) {  $major = $1; next; }
+		if ($major>0 and /^\s+(\d)\s+'(.*)'/) {
+			my $minor = $1; $device = $2; $device =~ s/\s+$//;
+			$port2device{"$major:$minor"} = $device;
+			$device2port{$device} = "$major:$minor";
+			next;
+		}
+		if (/Connected From:\s+(.+)/) {
+			foreach (split /,\s*/, $1) {
+				push @connections, "$port2device{$_} -> $device";
+			}
+		}
+	}
+	close P;
+	if (@connections) {
+		my @disconnect = ();
+		if (1 == @connections) {
+			my $msg = "do you want disconnect this one ?";
+			my $disconnect = choose($msg, @connections);
+			if ($disconnect) { @disconnect = ($disconnect); }
+		} else {
+			my $msg = "do you want disconnect any of these ?";
+			@disconnect = choose($msg, @connections);
+		}
+		my $is_ok = 0;
+		foreach (@disconnect) {
+			if (!$_) { last; }
+			if (/^(.+) -> (.+)/) {
+				system "$aconnect -d $device2port{$1} $device2port{$2}";
+				$is_ok = 1;
+			} else {
+				warn "unrecognised connection $_\n";
+			}
+		}
+		if ($is_ok) { inform('OK'); }
+	}
 	my $inport  = midi_in_port();
 	return unless $inport;
 	my $outport = midi_out_port();
@@ -505,17 +656,20 @@ EOT
 }
 sub man {
 	my @topics = @_ || (
-		'aconnect', 'alsamixer', 'aplaymidi', 'arecordmidi', 'atacontrol',
-		'audio_stuff', 'burncd', 'cdcontrol', 'cdda2wav',  'cdrecord',
-		'File::Format::RIFF', 'icedax', 'lame', 'mencoder', 'mkisofs',
-		'mplayer', 'normalize', 'normalize-audio', 'pciconf', 'sndfile-play',
-		'sox', 'soxexam',
-		'Term::Clui', 'Term::Clui::FileSelect', 'timidity', 'timidity.cfg',
-		'toolame', 'wodim',
+	 'aconnect', 'alsamixer', 'aplaymidi', 'arecordmidi', 'atacontrol',
+	 'audio_stuff', 'bristol', 'burncd',
+	 'cdcontrol', 'cdda2wav',  'cdrecord',
+	 'File::Format::RIFF',
+	 'genisoimage', 'icedax', 'lame', 'mencoder', 'mkisofs',
+	 'mplayer', 'normalize', 'normalize-audio', 'pciconf', 'sndfile-play',
+	 'sox', 'soxexam', 'soxeffect',
+	 'Term::Clui', 'Term::Clui::FileSelect', 'timidity', 'timidity.cfg',
+	 'toolame', 'wodim',
 	);
 	my $topic = choose('Which topic ?', @topics); return unless $topic;
 	if ($topic eq 'audio_stuff') { system "perldoc $0";
 	} elsif ($topic =~ /::/) { system "perldoc $topic";
+	} elsif ($topic =~ /bristol/) { system "$startBristol -v -h | less";
 	} else { system "$man $topic";
 	}
 }
@@ -574,10 +728,10 @@ sub set_cdda_device {
 
 sub tasks {
 	my @tasks = (
-		'burn MP3->MP3CD', 'burn WAV->AudioCD',
+		'run a Bristol synth', 'burn MP3->MP3CD', 'burn WAV->AudioCD',
 		'change Directory', 'configure Timidity', 'connect MIDIports',
 		'convert MIDI->MP3', 'convert MIDI->WAV', 'convert Muscript->MIDI',
-		'copy audio CD', 'decode MP3->WAV',
+		'copy audio CD', 'copy video DVD', 'decode MP3->WAV',
 		'edit Muscript', 'encode WAV->MP2', 'encode WAV->MP3',
 		'rip AudioCD->WAV', 'rip MP3CD->MP3', 'play MIDI,WAV,MP3',
 		'record AudioIn->WAV', 'record Keyboard->MIDI', 'run alsamixer',
@@ -641,25 +795,32 @@ This script, which comes along with the I<Term::Clui> Perl-module
 in its I<examples> directory,
 integrates
 various open-source programs for handling
-Muscript, Midi, WAV, MP3 and CDDA files
+Muscript, Midi, WAV, MP3, CDDA and DVD files
 into one ArrowKey-and-Return user-interface,
 
 =head1 FEATURES
 
+  burn MP3->MP3CD     burn WAV->AudioCD     change Directory
+  configure Timidity  connect MIDIports     consult Manual
+  convert MIDI->MP3   convert MIDI->WAV     convert Muscript->MIDI
+  copy audio CD       copy video DVD        create Makefile
+  decode MP3->WAV     edit Muscript         encode WAV->MP2
+  encode WAV->MP3     list Soundfont        play MIDI,WAV,MP3
+  record AudioIn->WAV record Keyboard->MIDI rip AudioCD->WAV
+  rip MP3CD->MP3      run a Bristol synth   run alsamixer
+
 =over 3
-		'rip AudioCD->WAV', 'burn WAV->AudioCD',
-		'rip MP3CD->MP3', 'burn MP3->MP3CD',
-		'encode WAV->MP3', 'decode MP3->WAV',
-		'play WAV,MP3,MID', 'record Keyboard->MIDI',
-		'edit Muscript', 'convert Muscript->MIDI',
-		'convert MIDI->WAV', 'convert MIDI->MP3',
-		'change Directory', 'configure Timidity',
 
 =item I<rip AudioCD-E<gt>WAV> and I<burn WAV-E<gt>AudioCD>
 
 These features use I<cdda2wav> or I<icedax>
 and I<cdrecord> and I<wodim> to get files
 off AudioCDs into I<.wav> format, or vice-versa.
+
+=item I<copy video DVD>
+
+This feature uses I<mkisofs> or I<genisoimage> to get files off
+a Video DVD and I<growisofs> to burn them onto an empty one.
 
 =item I<rip MP3CD-E<gt>MP3> and I<burn MP3-E<gt>MP3CD>
 
@@ -673,12 +834,10 @@ from I<.wav> format into I<.mp3> format or vice-versa.
 
 =item I<play WAV,MP3,MID>
 
-Depending on which file you select,
-this feature either uses
-I<mpg123> to play a I<.mp3> file, or
-I<sndfile-play> to play a I<.wav> or I<.mp3> file
-to the headphones, or I<aplaymidi> to send a I<.mid> file to a
-Synthesiser.
+Depending on which file you select, this feature
+either uses I<mplayer> or I<mpg123> to play a I<.mp3> file,
+or I<play> or I<sndfile-play> to play a I<.wav> file to the headphones,
+or I<aplaymidi> to send a I<.mid> file to a Synthesiser.
 
 =back
 
@@ -689,12 +848,14 @@ Peter J Billam  www.pjb.com.au/comp/contact.html
 =head1 CREDITS
 
 Based on Term::Clui, alsamixer, aplaymidi, arecordmidi, cdrecord or wodim,
-cdda2wav or icedax, lame, mpg123, normalize-audio, sndfile_play and timidity.
+cdda2wav or icedax, lame, mkisofs or genisoimage, mpg123,
+normalize-audio, sox, sndfile_play, startBristol and timidity.
 
 =head1 SEE ALSO
 
 http://www.pjb.com.au/ ,
 http://search.cpan.org/~pjb , 
+http://bristol.sourceforge.net ,
 Term::Clui,
 alsamixer(1),
 aplaymidi(1),
@@ -702,14 +863,18 @@ arecordmidi(1),
 cdrecord(1),
 cdda2wav(1),
 festival(1),
+genisoimage(1),
+growisofs(1),
 icedax(1),
 lame(1),
 mpg123(1),
+mkisofs(1),
 normalize(1),
 normalize-audio(1),
 sndfile_play(1),
 sox(1),
 soxexam(7),
+soxeffect(7),
 timidity(1),
 wodim(1)
 

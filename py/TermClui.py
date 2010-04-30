@@ -1,11 +1,11 @@
-#! /usr/local/bin/python3
+#! /usr/bin/python3
 r'''
 a Python3 module offering a Command-Line User Interface
 
  from TermClui import *
  chosen = choose("A Title", a_list);  # single choice
- chosen = choose("A Title", a_list, multichoice=True) # multiple choice
- x = choose("Which ?\n(Arrow-keys and Return)", w) # multi-line question
+ chosen = choose("A Title", a_list, multichoice=True)  # multiple choice
+ x = choose("Which ?\n(Mouse, or Arrow-keys and Return)", w) # multi-line q
  confirm(text) and do_something()
  answer = ask(question)
  answer = ask(question, suggestion)
@@ -28,12 +28,12 @@ accumulates on the screen, available for review or for cut/paste.
 This user-interface can be intermixed with standard applications
 which write to STDOUT or STDERR, such as make, pgp, rcs etc.
 
-For the user, choose() uses arrow keys (or hjkl) and Return or q;
-also SpaceBar for multiple choices.  confirm() expects y, Y, n or N.
-In general, ctrl-L redraws the (currently active bit of the) screen.
-edit() and view() use the default EDITOR and PAGER if possible.  
-Window-size-changes are handled, though the screen only gets
-redrawn after the next keystroke (e.g. ctrl-L)
+For the user, choose() uses either (since 1.50) the mouse; or arrow
+keys (or hjkl) and Return or q; also SpaceBar for multiple choices.
+confirm() expects y, Y, n or N.  In general, ctrl-L redraws the
+(currently active bit of the) screen.  edit() and view() use the
+default EDITOR and PAGER if possible.  Window-size-changes are handled,
+though the screen only gets redrawn after the next keystroke (e.g. ctrl-L)
 
 choose(), ask() and confirm() all accept multi-line questions:
 the first line should be the core question (typically it will
@@ -41,19 +41,22 @@ end in a question-mark) and will remain on the screen together
 with the user's answer.  The subsequent lines appear beneath the
 dialogue, and will disappear when the user has given the answer.
 
-TermClui.py does not use curses (a whole-of-screen interface),
-it uses a small and portable subset of vt100 sequences.
+TermClui.py does not use curses (a whole-of-screen interface), it uses
+a small and portable subset of vt100 sequences.  Also (since 1.50) the
+SET_ANY_EVENT_MOUSE and kmous (terminfo) sequences, which are supported
+by all xterm, rxvt, konsole, screen, linux, gnome and putty terminals.
 
-Download TermClui.py from  www.pjb.com.au/midi/free/TermClui.py
+Download TermClui.py from  www.pjb.com.au/midi/free/TermClui.py  or
+from http://cpansearch.perl.org/src/PJB/Term-Clui-1.50/py/TermClui.py
 and put it in your PYTHONPATH.  TermClui.py depends on Python3.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.44
+Term::Clui and Term::Clui::FileSelect.  This is version 1.50
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.44'
+VERSION = '1.50'
 
 # ------------------------ vt100 stuff -------------------------
 
@@ -72,10 +75,17 @@ _KEY_BTAB  = 0o541
 _getchar = lambda: sys.stdin.read(1)
 _ttyin   = 0
 _ttyout  = 0
+_AbsCursX = 0
+_AbsCursY = 0
+_TopRow = 0
+_CursorRow = 0
+_LastEventWasPress = 0   # in order to ignore left-over button-ups
 
-# my $irow; my $icol;   # maintained by puts, up, down, left and right
-_irow = 0
+_irow = 0   # maintained by _puts, _up, _down, _left and _right
 _icol = 0
+_irow_a = []  # maintined by _layout()
+_icol_a = []
+
 def _puts(s):
     global _ttyout, _irow, _icol
     _irow += s.count("\n")
@@ -98,6 +108,7 @@ def _attrset(attr):
              print("\033[7m", end='', file=_ttyout)
         if attr & _A_UNDERLINE:
              print("\033[4m", end='', file=_ttyout)
+    _ttyout.flush()
 
 def _beep():
     global _ttyout
@@ -114,18 +125,23 @@ def _clrtoeol():
 def _black():
     global _ttyout
     print("\033[30m", end='', file=_ttyout)
+    _ttyout.flush()
 def _red():
     global _ttyout
     print("\033[31m", end='', file=_ttyout)
+    _ttyout.flush()
 def _green():
     global _ttyout
     print("\033[32m", end='', file=_ttyout)
+    _ttyout.flush()
 def _blue():
     global _ttyout
     print("\033[34m", end='', file=_ttyout)
+    _ttyout.flush()
 def _violet():
     global _ttyout
     print("\033[35m", end='', file=_ttyout)
+    _ttyout.flush()
 
 def _getc_wrapper(timeout):
     # may not work on openbsd...
@@ -144,6 +160,7 @@ def _getc_wrapper(timeout):
 def _getch():
     global _KEY_UP, _KEY_DOWN, _KEY_RIGHT, _KEY_LEFT
     global _KEY_PPAGE, _KEY_NPAGE, _KEY_BTAB
+    global _AbsCursX, _AbsCursY
     c = _getc_wrapper(0)
     if c == "\033":
         c = _getc_wrapper(0)
@@ -175,46 +192,87 @@ def _getch():
                 return(_KEY_RIGHT)
             if (c == 'D'):
                 return(_KEY_LEFT)
-            if (c == '5'):
-                _getc_wrapper(0)
-                return(_KEY_PPAGE)
-            if (c == '6'):
-                _getc_wrapper(0)
-                return(_KEY_NPAGE)
+            if (c == 'M'):   # mouse report
+                # http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
+                event_type = ord(_getc_wrapper(0))-32;
+                x = ord(_getc_wrapper(0))-32;
+                y = ord(_getc_wrapper(0))-32;
+                # my $shift   = $event_type & 0x04; # used by wm
+                # my $meta  = $event_type & 0x08;   # used by wm
+                # my $control = $event_type & 0x10; # used by xterm
+                button_drag = (event_type & 0x20) >> 5
+                low3bits = event_type & 0x03
+                if low3bits == 0x03:
+                    button_pressed = 0
+                else:  # button 4 means wheel-up, button 5 means wheel-down
+                    if event_type & 0x40:
+                         button_pressed = low3bits + 4
+                    else:
+                         button_pressed = low3bits + 1
+                t = _handle_mouse(x,y,button_pressed,button_drag)
+                if t != '':
+                    return(t)
+                else:
+                    return(_getch())
+            if re.search('\d', c) != None:
+                c1 = _getc_wrapper(0)
+                # _debug("c="+str(c)+" c1="+str(c1))
+                if c1 == '~':
+                    if (c == '5'):
+                        return(_KEY_PPAGE)
+                    if (c == '6'):
+                        return(_KEY_NPAGE)
+                else:  # cursor-position report, response to \033[6n
+                    _AbsCursY = int(c)
+                    # _debug("_AbsCursY="+str(_AbsCursY))
+                    while True:
+                        if c1 == ';':
+                            break
+                        _AbsCursY = 10*_AbsCursY + int(c1)
+                        # debug("c1=$c1 AbsCursY=$AbsCursY");
+                        c1 = _getc_wrapper(0)
+                    _AbsCursX = 0
+                    while True:
+                        c1 = _getc_wrapper(0)
+                        if c1 == 'R':
+                            break
+                        _AbsCursX = 10*_AbsCursX + int(c1)
+                    return _getc_wrapper(0)
+
             if (c == 'Z'):
                 return(_KEY_BTAB)
             return(c)
         return(c)
-    elif c == "\217":
-        c = _getc_wrapper(0)
-        if (c == 'A'):
-            return(_KEY_UP)
-        if (c == 'B'):
-            return(_KEY_DOWN)
-        if (c == 'C'):
-            return(_KEY_RIGHT)
-        if (c == 'D'):
-            return(_KEY_LEFT)
-        return(c)
-    elif c == "\233":
-        c = _getc_wrapper(0)
-        if (c == 'A'):
-            return(_KEY_UP)
-        if (c == 'B'):
-            return(_KEY_DOWN)
-        if (c == 'C'):
-            return(_KEY_RIGHT)
-        if (c == 'D'):
-            return(_KEY_LEFT)
-        if (c == '5'):
-            _getc_wrapper(0)
-            return(_KEY_PPAGE)
-        if (c == '6'):
-            _getc_wrapper(0)
-            return(_KEY_NPAGE)
-        if (c == 'Z'):
-            return(_KEY_BTAB)
-        return(c)
+    #elif c == "\217":
+    #    c = _getc_wrapper(0)
+    #    if (c == 'A'):
+    #        return(_KEY_UP)
+    #    if (c == 'B'):
+    #        return(_KEY_DOWN)
+    #    if (c == 'C'):
+    #        return(_KEY_RIGHT)
+    #    if (c == 'D'):
+    #        return(_KEY_LEFT)
+    #    return(c)
+    #elif c == "\233":
+    #    c = _getc_wrapper(0)
+    #    if (c == 'A'):
+    #        return(_KEY_UP)
+    #    if (c == 'B'):
+    #        return(_KEY_DOWN)
+    #    if (c == 'C'):
+    #        return(_KEY_RIGHT)
+    #    if (c == 'D'):
+    #        return(_KEY_LEFT)
+    #    if (c == '5'):
+    #        _getc_wrapper(0)
+    #        return(_KEY_PPAGE)
+    #    if (c == '6'):
+    #        _getc_wrapper(0)
+    #        return(_KEY_NPAGE)
+    #    if (c == 'Z'):
+    #        return(_KEY_BTAB)
+    #    return(c)
     else:
         return(c)
 
@@ -266,21 +324,71 @@ def _goto(newcol,newrow):
 # def move(ix,iy):   Unused...
 #     printf TTY "\033[%d;%dH",$iy+1,$ix+1; }
 
-_initscr_already_run = 0   # its a counter
+
+
+_InitscrAlreadyRun = 0   # its a counter
 # tty = True
 _ttyout_fnum = 0
 _old_tcattr = 0
-def _initscr():
-    global tty,_ttyout_fnum,_old_tcattr,_getchar, _ttyin,_ttyout, _initscr_already_run, _icol,_irow
+_IsMouseMode = False;
+_WasMouseMode = False;
+
+def _enter_mouse_mode ():   # 1.50  # do we need this in Python?
+    global _ttyin, _IsMouseMode, _EncodingString
+    if _IsMouseMode:
+        warn("_enter_mouse_mode but already IsMouseMode\r\n")
+        return 1
+    if _EncodingString:
+        _ttyin.close()
+        _ttyin  = open("/dev/tty", mode="r")
+    print("\033[?1003h", end='', file=_ttyout)  # sets SET_ANY_EVENT_MOUSE mode
+    _ttyout.flush()
+    _IsMouseMode = True
+    return 1
+
+def _leave_mouse_mode ():   # 1.50  # do we need this in Python?
+    global _ttyin, _IsMouseMode, _EncodingString
+    if _IsMouseMode:
+        warn("_leave_mouse_mode but not IsMouseMode\r\n")
+        return 1
+    if _EncodingString:
+        _ttyin.close()
+        _ttyin  = open("/dev/tty", mode="r")
+    print("\033[?1003l", end='', file=_ttyout)  # cancel SET_ANY_EVENT_MOUSE mode
+    _ttyout.flush()
+    _IsMouseMode = False
+    return 1
+
+def _initscr(mouse_mode=False):  # needed for 1.50
+    global tty,_ttyout_fnum,_old_tcattr,_getchar, _ttyin,_ttyout, _InitscrAlreadyRun, _icol,_irow
+    global _IsMouseMode, _WasMouseMode
     _icol = 0
     _irow = 0
-    if _initscr_already_run > 0:
-        _initscr_already_run+=1
+    if _InitscrAlreadyRun > 0:
+        _InitscrAlreadyRun+=1
+        if not mouse_mode and _IsMouseMode:
+            if not _leave_mouse_mode():
+                return(False)
+        elif mouse_mode and not _IsMouseMode:
+            if not _enter_mouse_mode():
+                return(False)
+        _WasMouseMode = _IsMouseMode
+        _icol = 0
+        _irow = 0
         return
+    else:
+        _InitscrAlreadyRun = 1
 
-    _initscr_already_run = 1
     _ttyout = open("/dev/tty", mode="w")
     _ttyin  = open("/dev/tty", mode="r")
+
+    if mouse_mode:
+        _IsMouseMode = True
+        # encoding_string = ':bytes';
+        print("\033[?1003h", end='', file=_ttyout) # sets SET_ANY_EVENT_MOUSE
+    else:
+        _IsMouseMode = False
+        #$encoding_string = $EncodingString;
 
     try:
         import tty
@@ -297,14 +405,28 @@ def _initscr():
         _getchar = lambda: _ttyin.readline()[:-1][:1]
 
 def _endwin():
-    global _ttyout, tty,_ttyout_fnum,_old_tcattr, _initscr_already_run
+    global _ttyout, tty,_ttyout_fnum,_old_tcattr, _InitscrAlreadyRun
+    global _IsMouseMode, _WasMouseMode
     print("\033[0m", end='', file=_ttyout)
-    if _initscr_already_run > 1:
-        _initscr_already_run-=1
+    if _InitscrAlreadyRun > 1:
+        if _IsMouseMode and not _WasMouseMode:
+            _leave_mouse_mode()
+        elif not _IsMouseMode and _WasMouseMode:
+            _enter_mouse_mode()
+        _InitscrAlreadyRun-=1
+        return()
+    print("\033[?1003l", end='', file=_ttyout)
+    _ttyout.flush()
+    if _InitscrAlreadyRun > 1:
+        if _IsMouseMode and not _WasMouseMode:
+            _leave_mouse_mode()
+        elif not _IsMouseMode and _WasMouseMode:
+            _enter_mouse_mode()
+        _InitscrAlreadyRun-=1
         return
     if _ttyout_fnum:
         tty.tcsetattr(_ttyout_fnum, tty.TCSAFLUSH, _old_tcattr)
-    _initscr_already_run = 0
+    _InitscrAlreadyRun = 0
 
 # ----------------------- size handling ----------------------
 
@@ -449,7 +571,7 @@ def _debug(string):
 
 # my (%irow, %icol, $nrows, $clue_has_been_given, $choice, $this_cell);
 random.seed(None)
-HOME = os.getenv('HOME') or os.getenv('LOGDIR') or os.path.expanduser('~')
+_HOME = os.getenv('HOME') or os.getenv('LOGDIR') or os.path.expanduser('~')
 _marked    = []
 _clue_has_been_given = False
 _this_cell = 0
@@ -474,8 +596,9 @@ the various choices (the choice under the cursor when Return is
 pressed is also selected), and choose() returns a list of strings.
 '''
     # wantarray doesn't exist in Python because no $ or @
-    global _maxcols, _marked, _list, _size_changed, _nrows, _icol, _irow
-    global _this_cell, _clue_has_been_given, _choice
+    global _maxcols, _marked, _list, _size_changed, _nrows, _icol_a, _irow_a
+    global _irow
+    global _ttyout, _this_cell, _clue_has_been_given, _choice, _CursorRow
     _list = a_list
     for i in range(len(_list)):
         _list[i] = re.sub('[\r\n]+$', '', _list[i])   # chop final \n if any
@@ -491,7 +614,7 @@ pressed is also selected), and choose() returns a list of strings.
     firstlinelength = len(firstline)
     _choice = get_default(firstline)
     chosen = []
-    _initscr()
+    _initscr(mouse_mode=True)
     _size_and_layout(0)
     if (len(lines) > 1):
        otherlines_a = _fmt(lines[1])
@@ -525,6 +648,10 @@ pressed is also selected), and choose() returns a list of strings.
             else:
                 return None
     _wr_screen()
+    print("\033[6n", end='', file=_ttyout)  # u7 will set _AbsCursX, _AbsCur
+    _ttyout.flush()
+    _CursorRow = _irow_a[_this_cell]  # global, needed by handle_mouse
+    # _debug("_CursorRow="+str(_CursorRow))
 
     while True:
         c = _getch()
@@ -686,20 +813,18 @@ pressed is also selected), and choose() returns a list of strings.
         elif c == " ":
             if multichoice:
                 _marked[_this_cell] = not _marked[_this_cell]
-                if (_this_cell < (len(_list)-1)):
-                    _this_cell+=1
-                    _wr_cell(_this_cell-1)
-                    _wr_cell(_this_cell)
-            elif (_this_cell < (len(_list)-1)):
-                _this_cell+=1
-                _wr_cell(_this_cell-1)
+                # if (_this_cell < (len(_list)-1)):  # 1.50
+                #    _this_cell+=1
+                #    _wr_cell(_this_cell-1)
                 _wr_cell(_this_cell)
+            #elif (_this_cell < (len(_list)-1)):
+            #    _this_cell+=1
+            #    _wr_cell(_this_cell-1)
+            #    _wr_cell(_this_cell)
 
     _endwin()
     print("choose: shouldn't reach here ...\n", file=sys.stderr)
 
-_irow_a = []
-_icol_a = []
 def _layout(my_list):
     global _irow_a, _icol_a, _this_cell, _maxcols, _maxrows, _choice
     _irow_a = []
@@ -897,7 +1022,7 @@ user made the last time they were asked this question.
     n_tries = 5
     while n_tries > 0:
         try:
-            CHOICES = dbm.open (_dbm_file(), 'r', 0o600)
+            CHOICES = dbm.open (_dbm_file(), 'c', 0o600)
             break
         except NameError:
             return ''
@@ -944,17 +1069,58 @@ to set the next default choice.
     return answer
 
 def _dbm_file():
-    global HOME
+    global _HOME
     if (os.getenv('CLUI_DIR') == 'OFF'):
         return None
     if (os.getenv('CLUI_DIR')):
         db_dir = os.getenv('CLUI_DIR')
-        db_dir = re.sub('^~', HOME, db_dir)
+        db_dir = re.sub('^~', _HOME, db_dir)
     else:
-        db_dir = HOME+"/.clui_dir"
-
+        db_dir = _HOME+"/.clui_dir"
     os.path.exists(db_dir) or os.mkdir(db_dir, 0o750)
     return db_dir+"/choices"
+
+def _handle_mouse(x, y, button_pressed, button_drag):  # 1.50 
+    # _debug("_handle_mouse: x="+str(x)+" y="+str(y))
+    global _TopRow, _AbsCursY, _CursorRow, _LastEventWasPress
+    global _this_cell, _irow_a, _icol_a, _list
+    _TopRow = _AbsCursY - _CursorRow
+    # _debug("_TopRow="+str(_TopRow)+" _AbsCursY="+str(_AbsCursY)+" _CursorRow="+str(_CursorRow))
+    if _LastEventWasPress:
+        _LastEventWasPress = False
+        return('')
+    if y < _TopRow:
+        return('')
+    mouse_row = y - _TopRow
+    mouse_col = x - 1
+    # _debug("x="+str(x)+" y="+str(y)+" mouse_row="+str(mouse_row));
+    # _debug("button_pressed=$button_pressed button_drag=$button_drag");
+    found = False
+    for i in range(len(_irow_a)):
+        if _irow_a[i] == mouse_row:
+            # _debug("list[$i]=$list[$i] is the right row");
+            if _icol_a[i] < mouse_col and (_icol_a[i]+len(_list[i])) >= mouse_col:
+                found = True
+                break
+            if _irow_a[i] > mouse_row:
+                break
+        i += 1
+    if not found:
+        return()
+    # if xterm doesn't receive a button-up event it thinks it's dragging
+    return_char = ''
+    if button_pressed == 1 and not button_drag:
+        _LastEventWasPress = 1
+        return_char = _KEY_ENTER
+    elif button_pressed == 3 and not button_drag:
+        _LastEventWasPress = 1
+        return_char = ' '
+    if i != _this_cell:
+        t = _this_cell
+        _this_cell = i
+        _wr_cell(t)
+        _wr_cell(_this_cell)
+    return(return_char)
 
 # ----------------------- confirm stuff -------------------------
 
@@ -1387,6 +1553,7 @@ def _erase_lines(nline):
     global _ttyout
     _goto(0, nline)
     print("\033[J", end='', file=_ttyout)
+    _ttyout.flush()
 
 def _fmt(text, nofill=False):
     '''Used by _tiview, ask and confirm; formats the text within maxcols cols'''
@@ -1581,7 +1748,7 @@ Only directories will be displayed.  The default is False.
     if Path and os.path.isdir(Path):
         dir = re.sub('([^/])$', r'\1/', Path)
     else:
-        dir = re.sub('([^/])$', r'\1/', HOME)
+        dir = re.sub('([^/])$', r'\1/', _HOME)
  
     if TopDir:
         if os.path.isdir(TopDir):
