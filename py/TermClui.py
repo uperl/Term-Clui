@@ -56,7 +56,7 @@ Term::Clui and Term::Clui::FileSelect.  This is version 1.50
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.50'
+VERSION = '1.51'
 
 # ------------------------ vt100 stuff -------------------------
 
@@ -157,6 +157,13 @@ def _getc_wrapper(timeout):
         except (IOError):
             continue
 
+def _dbc(c):
+    if ord(c) < 33:
+        _debug("ord(c)="+str(ord(c)))
+    else:
+        _debug("c="+str(c))
+    return
+
 def _getch():
     global _KEY_UP, _KEY_DOWN, _KEY_RIGHT, _KEY_LEFT
     global _KEY_PPAGE, _KEY_NPAGE, _KEY_BTAB
@@ -164,39 +171,42 @@ def _getch():
     c = _getc_wrapper(0)
     if c == "\033":
         c = _getc_wrapper(0)
-        if (c == None):
-            return("\033")
+        if c == None:
+            return "\033" 
         if (c == 'A'):
-            return(_KEY_UP)
+            return _KEY_UP 
         if (c == 'B'):
-            return(_KEY_DOWN)
+            return _KEY_DOWN 
         if (c == 'C'):
-            return(_KEY_RIGHT)
+            return _KEY_RIGHT 
         if (c == 'D'):
-            return(_KEY_LEFT)
+            return _KEY_LEFT 
         if (c == '5'):
             _getc_wrapper(0)
-            return(_KEY_PPAGE)
+            return _KEY_PPAGE 
         if (c == '6'):
             _getc_wrapper(0)
-            return(_KEY_NPAGE)
+            return _KEY_NPAGE 
         if (c == 'Z'):
-            return(_KEY_BTAB)
+            return _KEY_BTAB 
         if (c == '['):
             c = _getc_wrapper(0)
             if (c == 'A'):
-                return(_KEY_UP)
+                return _KEY_UP 
             if (c == 'B'):
-                return(_KEY_DOWN)
+                return _KEY_DOWN 
             if (c == 'C'):
-                return(_KEY_RIGHT)
+                return _KEY_RIGHT 
             if (c == 'D'):
-                return(_KEY_LEFT)
+                return _KEY_LEFT 
             if (c == 'M'):   # mouse report
                 # http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
                 event_type = ord(_getc_wrapper(0))-32;
                 x = ord(_getc_wrapper(0))-32;
                 y = ord(_getc_wrapper(0))-32;
+                #event_type = ord(_ttyin.buffer.read(1))-32;
+                #x = ord(_ttyin.buffer.read(1))-32;
+                #y = ord(_ttyin.buffer.read(1))-32;
                 # my $shift   = $event_type & 0x04; # used by wm
                 # my $meta  = $event_type & 0x08;   # used by wm
                 # my $control = $event_type & 0x10; # used by xterm
@@ -211,25 +221,22 @@ def _getch():
                          button_pressed = low3bits + 1
                 t = _handle_mouse(x,y,button_pressed,button_drag)
                 if t != '':
-                    return(t)
+                    return t 
                 else:
-                    return(_getch())
+                    return _getch() 
             if re.search('\d', c) != None:
                 c1 = _getc_wrapper(0)
-                # _debug("c="+str(c)+" c1="+str(c1))
                 if c1 == '~':
-                    if (c == '5'):
-                        return(_KEY_PPAGE)
-                    if (c == '6'):
-                        return(_KEY_NPAGE)
+                    if c == '5':
+                        return _KEY_PPAGE 
+                    if c == '6':
+                        return _KEY_NPAGE 
                 else:  # cursor-position report, response to \033[6n
                     _AbsCursY = int(c)
-                    # _debug("_AbsCursY="+str(_AbsCursY))
                     while True:
                         if c1 == ';':
                             break
                         _AbsCursY = 10*_AbsCursY + int(c1)
-                        # debug("c1=$c1 AbsCursY=$AbsCursY");
                         c1 = _getc_wrapper(0)
                     _AbsCursX = 0
                     while True:
@@ -237,44 +244,14 @@ def _getch():
                         if c1 == 'R':
                             break
                         _AbsCursX = 10*_AbsCursX + int(c1)
-                    return _getc_wrapper(0)
+                    return _getch()
 
-            if (c == 'Z'):
-                return(_KEY_BTAB)
-            return(c)
-        return(c)
-    #elif c == "\217":
-    #    c = _getc_wrapper(0)
-    #    if (c == 'A'):
-    #        return(_KEY_UP)
-    #    if (c == 'B'):
-    #        return(_KEY_DOWN)
-    #    if (c == 'C'):
-    #        return(_KEY_RIGHT)
-    #    if (c == 'D'):
-    #        return(_KEY_LEFT)
-    #    return(c)
-    #elif c == "\233":
-    #    c = _getc_wrapper(0)
-    #    if (c == 'A'):
-    #        return(_KEY_UP)
-    #    if (c == 'B'):
-    #        return(_KEY_DOWN)
-    #    if (c == 'C'):
-    #        return(_KEY_RIGHT)
-    #    if (c == 'D'):
-    #        return(_KEY_LEFT)
-    #    if (c == '5'):
-    #        _getc_wrapper(0)
-    #        return(_KEY_PPAGE)
-    #    if (c == '6'):
-    #        _getc_wrapper(0)
-    #        return(_KEY_NPAGE)
-    #    if (c == 'Z'):
-    #        return(_KEY_BTAB)
-    #    return(c)
+            if c == 'Z':
+                return _KEY_BTAB 
+            return c 
+        return c 
     else:
-        return(c)
+        return c 
 
 def _up(n):
     global _irow, _ttyout
@@ -334,44 +311,42 @@ _IsMouseMode = False;
 _WasMouseMode = False;
 
 def _enter_mouse_mode ():   # 1.50  # do we need this in Python?
-    global _ttyin, _IsMouseMode, _EncodingString
+    global _ttyin, _IsMouseMode
     if _IsMouseMode:
-        warn("_enter_mouse_mode but already IsMouseMode\r\n")
+        _warn("_enter_mouse_mode but already IsMouseMode\r\n")
         return 1
-    if _EncodingString:
-        _ttyin.close()
-        _ttyin  = open("/dev/tty", mode="r")
+    #_ttyin.close()
+    #_ttyin  = open("/dev/tty", mode="rb", buffering=0)
     print("\033[?1003h", end='', file=_ttyout)  # sets SET_ANY_EVENT_MOUSE mode
-    _ttyout.flush()
+    #_ttyout.flush()
     _IsMouseMode = True
     return 1
 
 def _leave_mouse_mode ():   # 1.50  # do we need this in Python?
-    global _ttyin, _IsMouseMode, _EncodingString
-    if _IsMouseMode:
-        warn("_leave_mouse_mode but not IsMouseMode\r\n")
+    global _ttyin, _IsMouseMode
+    if not _IsMouseMode:
+        _warn("_leave_mouse_mode but not IsMouseMode\r\n")
         return 1
-    if _EncodingString:
-        _ttyin.close()
-        _ttyin  = open("/dev/tty", mode="r")
-    print("\033[?1003l", end='', file=_ttyout)  # cancel SET_ANY_EVENT_MOUSE mode
-    _ttyout.flush()
+    #_ttyin.close()
+    #_ttyin  = open("/dev/tty", mode="r")
+    print("\033[?1003l", end='', file=_ttyout)  # cancel SET_ANY_EVENT_MOUSE
+    #_ttyout.flush()
     _IsMouseMode = False
     return 1
 
 def _initscr(mouse_mode=False):  # needed for 1.50
-    global tty,_ttyout_fnum,_old_tcattr,_getchar, _ttyin,_ttyout, _InitscrAlreadyRun, _icol,_irow
-    global _IsMouseMode, _WasMouseMode
+    global _ttyout_fnum, _old_tcattr, _getchar, _ttyin, _ttyout
+    global _InitscrAlreadyRun, _icol,_irow, _IsMouseMode, _WasMouseMode
     _icol = 0
     _irow = 0
     if _InitscrAlreadyRun > 0:
         _InitscrAlreadyRun+=1
         if not mouse_mode and _IsMouseMode:
             if not _leave_mouse_mode():
-                return(False)
+                return False 
         elif mouse_mode and not _IsMouseMode:
             if not _enter_mouse_mode():
-                return(False)
+                return False 
         _WasMouseMode = _IsMouseMode
         _icol = 0
         _irow = 0
@@ -380,29 +355,39 @@ def _initscr(mouse_mode=False):  # needed for 1.50
         _InitscrAlreadyRun = 1
 
     _ttyout = open("/dev/tty", mode="w")
-    _ttyin  = open("/dev/tty", mode="r")
 
     if mouse_mode:
+        #_ttyin  = open("/dev/tty", mode="rb", buffering=0)
+        _ttyin  = open("/dev/tty", mode="r")
         _IsMouseMode = True
         # encoding_string = ':bytes';
         print("\033[?1003h", end='', file=_ttyout) # sets SET_ANY_EVENT_MOUSE
     else:
+        _ttyin  = open("/dev/tty", mode="r")
         _IsMouseMode = False
-        #$encoding_string = $EncodingString;
 
     try:
         import tty
         _ttyout_fnum = _ttyout.fileno()
         _old_tcattr = tty.tcgetattr(_ttyout_fnum)
         tty.setcbreak(_ttyout_fnum)
-        mode = tty.tcgetattr(_ttyout_fnum)
+        mode = termios.tcgetattr(_ttyout_fnum)
         OFLAG = 1
         mode[OFLAG] = mode[OFLAG] & ~(termios.ONLCR | termios.ONLRET)
-        tty.tcsetattr(_ttyout_fnum, tty.TCSAFLUSH, mode)
-        _getchar = lambda: _ttyin.read(1)
+        termios.tcsetattr(_ttyout_fnum, termios.TCSANOW, mode)
+        # _getchar = lambda: _ttyin.read(1)  # but ttyin will be re-opened :-(
+        _getchar = lambda: _ttyin_read()
     except (ImportError, AttributeError):
         _ttyout_fnum = 0
-        _getchar = lambda: _ttyin.readline()[:-1][:1]
+        # _getchar = lambda: _ttyin.readline()[:-1][:1]
+        _getchar = lambda: _ttyin.readline()
+
+def _ttyin_read():
+    global _ttyin
+    return _ttyin.read(1)
+def _ttyin_readline():
+    global _ttyin
+    return _ttyin.readline()[:-1][:1]
 
 def _endwin():
     global _ttyout, tty,_ttyout_fnum,_old_tcattr, _InitscrAlreadyRun
@@ -414,7 +399,7 @@ def _endwin():
         elif not _IsMouseMode and _WasMouseMode:
             _enter_mouse_mode()
         _InitscrAlreadyRun-=1
-        return()
+        return
     print("\033[?1003l", end='', file=_ttyout)
     _ttyout.flush()
     if _InitscrAlreadyRun > 1:
@@ -425,7 +410,8 @@ def _endwin():
         _InitscrAlreadyRun-=1
         return
     if _ttyout_fnum:
-        tty.tcsetattr(_ttyout_fnum, tty.TCSAFLUSH, _old_tcattr)
+       termios.tcsetattr(_ttyout_fnum, termios.TCSANOW, _old_tcattr)
+    # tty.setcbreak()
     _InitscrAlreadyRun = 0
 
 # ----------------------- size handling ----------------------
@@ -501,7 +487,7 @@ ask() returns the string when the user presses Enter.
 
     while True:
         c = _getch()
-        if (c == "\r" or c == "\n"):
+        if c == "\r" or c == "\n":
             _erase_lines(1)
             break
         if _size_changed:
@@ -511,7 +497,7 @@ ask() returns the string when the user presses Enter.
             if i > 0:
                 i-=1
                 _left(1)
-        elif (c == _KEY_RIGHT) and (i < n):
+        elif c == _KEY_RIGHT and i < n:
             _puts('x') if _silent else _puts(s_a[i])
             i+=1
         elif (c == "\b") or (c == "\177"):
@@ -526,8 +512,7 @@ ask() returns the string when the user presses Enter.
                      j += 1
                  _clrtoeol()
                  _left(n-i)
-        elif (c == "\003" or c == "\030" or c == "\004"):
-             # clear ...
+        elif c == "\003" or c == "\030" or c == "\004":  # clear ...
             _left(i)
             i = 0
             n = 0
@@ -543,9 +528,8 @@ ask() returns the string when the user presses Enter.
             x = i  # do nothing
         elif str(type(c)) == "<class 'int'>":
             _beep()
-        elif ord(c) > 255:
+        elif ord(c) >= 32:
             _beep()
-        elif re.match('^[\040-\376]$', c):
             # splice(@s, $i, 0, $c);
             s_a.insert(i, c)
             n+=1
@@ -568,6 +552,9 @@ def _debug(string):
     tmp = open("/tmp/clui_debug", mode="a")
     print(string, file=tmp)
     tmp.close()
+
+def _warn(string):
+    print(string, file=sys.stderr)
 
 # my (%irow, %icol, $nrows, $clue_has_been_given, $choice, $this_cell);
 random.seed(None)
@@ -651,7 +638,6 @@ pressed is also selected), and choose() returns a list of strings.
     print("\033[6n", end='', file=_ttyout)  # u7 will set _AbsCursX, _AbsCur
     _ttyout.flush()
     _CursorRow = _irow_a[_this_cell]  # global, needed by handle_mouse
-    # _debug("_CursorRow="+str(_CursorRow))
 
     while True:
         c = _getch()
@@ -897,6 +883,7 @@ def _narrow_the_search(a_list):
     s = ''
     my_list = a_list
     _clue_has_been_given = True
+    _leave_mouse_mode()
     _ask_for_clue(nchoices, i, s);
     while True:
         c = _getch()
@@ -904,8 +891,9 @@ def _narrow_the_search(a_list):
             _size_and_layout(0)
             if _nrows < _maxrows:
                 _erase_lines(1)
+                _enter_mouse_mode()
                 return my_list
-        if (c == _KEY_LEFT) and (i > 0):
+        if c == _KEY_LEFT and i > 0:
              i-=1
              _left(1)
              continue
@@ -914,7 +902,7 @@ def _narrow_the_search(a_list):
                 _puts(s_a[i])
                 i+=1
                 continue
-        elif (c == "\b") or (c == "\177"):
+        elif c == "\b" or c == "\177":
             if i > 0:
                 n-=1
                 i-=1
@@ -930,6 +918,7 @@ def _narrow_the_search(a_list):
             if not s_a:
                 _clue_has_been_given = False
                 _erase_lines(1)
+                _enter_mouse_mode()
                 return []
             _left(i)
             i = 0
@@ -946,21 +935,22 @@ def _narrow_the_search(a_list):
             continue
         elif c == "\014":
             x = i   # do nothing
-        elif ord(c) > 255:
+        elif str(type(c)) == "<class 'int'>":
             _beep()
-        elif nchoices and re.match('^[\040-\376]$', c):
-            s_a.insert(i, c)
-            n+=1
-            i+=1
-            _puts(c)
-            j = i
-            while j < n:
-                _puts(s_a[j])
-                j += 1
-            _clrtoeol()
-            _left(n-i)
         else:
-            _beep()
+            if ord(c) >= 32:  # nchoices and ?
+                s_a.insert(i, c)
+                n+=1
+                i+=1
+                _puts(c)
+                j = i
+                while j < n:
+                    _puts(s_a[j])
+                    j += 1
+                _clrtoeol()
+                _left(n-i)
+            else:
+                _beep()
 
         # grep, and if $nchoices=1 return
         s = "".join(s_a);
@@ -980,6 +970,7 @@ def _narrow_the_search(a_list):
             _clrtoeol()
             _up(1)
             _clrtoeol()
+            _enter_mouse_mode()
             return my_list
         _ask_for_clue(nchoices, i, s)
 
@@ -1081,24 +1072,19 @@ def _dbm_file():
     return db_dir+"/choices"
 
 def _handle_mouse(x, y, button_pressed, button_drag):  # 1.50 
-    # _debug("_handle_mouse: x="+str(x)+" y="+str(y))
     global _TopRow, _AbsCursY, _CursorRow, _LastEventWasPress
     global _this_cell, _irow_a, _icol_a, _list
     _TopRow = _AbsCursY - _CursorRow
-    # _debug("_TopRow="+str(_TopRow)+" _AbsCursY="+str(_AbsCursY)+" _CursorRow="+str(_CursorRow))
     if _LastEventWasPress:
         _LastEventWasPress = False
-        return('')
+        return ''
     if y < _TopRow:
-        return('')
+        return ''
     mouse_row = y - _TopRow
     mouse_col = x - 1
-    # _debug("x="+str(x)+" y="+str(y)+" mouse_row="+str(mouse_row));
-    # _debug("button_pressed=$button_pressed button_drag=$button_drag");
     found = False
     for i in range(len(_irow_a)):
         if _irow_a[i] == mouse_row:
-            # _debug("list[$i]=$list[$i] is the right row");
             if _icol_a[i] < mouse_col and (_icol_a[i]+len(_list[i])) >= mouse_col:
                 found = True
                 break
@@ -1106,7 +1092,7 @@ def _handle_mouse(x, y, button_pressed, button_drag):  # 1.50
                 break
         i += 1
     if not found:
-        return()
+        return ''
     # if xterm doesn't receive a button-up event it thinks it's dragging
     return_char = ''
     if button_pressed == 1 and not button_drag:
@@ -1120,7 +1106,7 @@ def _handle_mouse(x, y, button_pressed, button_drag):  # 1.50
         _this_cell = i
         _wr_cell(t)
         _wr_cell(_this_cell)
-    return(return_char)
+    return return_char
 
 # ----------------------- confirm stuff -------------------------
 

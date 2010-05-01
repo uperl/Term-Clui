@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.50';   # mouse works within choose()
+$VERSION = '1.51';   # mouse works within choose()
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -50,6 +50,10 @@ $KEY_NPAGE = 0522;
 $KEY_BTAB  = 0541;
 my $AbsCursX = 0; my $AbsCursY = 0; my $TopRow = 0; my $CursorRow;
 my $LastEventWasPress = 0;  # in order to ignore left-over button-ups
+my %SpecialKey = map { $_, 1 } (   # 1.51, used by ask to ignore these
+	$KEY_UP, $KEY_LEFT, $KEY_RIGHT, $KEY_DOWN,
+	$KEY_PPAGE, $KEY_NPAGE, $KEY_BTAB
+);
 
 my $irow; my $icol;   # maintained by &puts, &up, &down, &left and &right
 sub puts   { my $s = join q{}, @_;
@@ -365,9 +369,8 @@ sub ask { my ($question, $default) = @_;
 		} elsif ($c eq "\cB") { &left($i); $i = 0;
 		} elsif ($c eq "\cE") { &right($n-$i); $i = $n;
 		} elsif ($c eq "\cL") {  # redraw ...
-		#} elsif ($c > 255) { &beep();
-		#} elsif ($c =~ /^[\040-\376]$/) {
-		} elsif (ord($c) > 32) {  # 1.50
+		} elsif ($SpecialKey{$c}) { &beep();
+		} elsif (ord($c) >= 32) {  # 1.51
 			splice(@s, $i, 0, $c);
 			&puts($silent ? "x" : $c);
 			$n++; $i++;
@@ -650,7 +653,8 @@ sub narrow_the_search { my @biglist = @_;
 		} elsif ($c eq "\cB") { &left($i); $i = 0; next;
 		} elsif ($c eq "\cE") { &right($n-$i); $i = $n; next;
 		} elsif ($c eq "\cL") {
-		} elsif (ord($c) > 32) {
+		} elsif ($SpecialKey{$c}) { &beep();
+		} elsif (ord($c) >= 32) {  # 1.51
 			splice(@s, $i, 0, $c);
 			$n++; $i++; &puts($c);
 			foreach $j ($i..$n) { &puts($s[$j]); } &clrtoeol();  &left($n-$i);
@@ -1091,9 +1095,9 @@ There is an associated file selector, Term::Clui::FileSelect
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.50/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.51/py/TermClui.py
 
-This is Term::Clui.pm version 1.50
+This is Term::Clui.pm version 1.51
 
 =head1 WINDOW-SIZE
 
@@ -1348,6 +1352,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.50/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.51/py/TermClui.py
 
 =cut
