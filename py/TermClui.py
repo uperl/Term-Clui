@@ -29,9 +29,9 @@ This user-interface can be intermixed with standard applications
 which write to STDOUT or STDERR, such as make, pgp, rcs etc.
 
 For the user, choose() uses either (since 1.50) the mouse; or arrow
-keys (or hjkl) and Return or q; also SpaceBar for multiple choices.
-confirm() expects y, Y, n or N.  In general, ctrl-L redraws the
-(currently active bit of the) screen.  edit() and view() use the
+keys (or hjkl) and Return or q; also SpaceBar or Button3 for multiple
+choices.  confirm() expects y, Y, n or N.  In general, ctrl-L redraws
+the (currently active bit of the) screen.  edit() and view() use the
 default EDITOR and PAGER if possible.  Window-size-changes are handled,
 though the screen only gets redrawn after the next keystroke (e.g. ctrl-L)
 
@@ -47,16 +47,16 @@ SET_ANY_EVENT_MOUSE and kmous (terminfo) sequences, which are supported
 by all xterm, rxvt, konsole, screen, linux, gnome and putty terminals.
 
 Download TermClui.py from  www.pjb.com.au/midi/free/TermClui.py  or
-from http://cpansearch.perl.org/src/PJB/Term-Clui-1.50/py/TermClui.py
+from http://cpansearch.perl.org/src/PJB/Term-Clui-1.52/py/TermClui.py
 and put it in your PYTHONPATH.  TermClui.py depends on Python3.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.50
+Term::Clui and Term::Clui::FileSelect.  This is version 1.52
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.51'
+VERSION = '1.52'
 
 # ------------------------ vt100 stuff -------------------------
 

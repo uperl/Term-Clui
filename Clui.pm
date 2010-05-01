@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.51';   # mouse works within choose()
+$VERSION = '1.52';   # mouse works within choose()
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -60,7 +60,6 @@ sub puts   { my $s = join q{}, @_;
 	$irow += ($s =~ tr/\n/\n/);
 	if ($s =~ /\r\n?$/) { $icol = 0;
 	} else { $icol += length($s);
-my $x=length($s); debug("s=$s length=$x");
 	}
 	print TTY $s;
 }
@@ -1077,7 +1076,7 @@ such as I<make>, I<pgp>, I<rcs> etc.
 For the user, I<choose()> uses either
 (since 1.50) the mouse;
 or arrow keys (or hjkl) and Return;
-also B<q> to quit, and SpaceBar to highlight multiple choices.
+also B<q> to quit, and SpaceBar or Button3 to highlight multiple choices.
 I<confirm()> expects y, Y, n or N.
 In general, ctrl-L redraws the (currently active bit of the) screen.
 I<edit()> and I<view()> use the default EDITOR and PAGER if possible.  
@@ -1095,9 +1094,9 @@ There is an associated file selector, Term::Clui::FileSelect
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.51/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.52/py/TermClui.py
 
-This is Term::Clui.pm version 1.51
+This is Term::Clui.pm version 1.52
 
 =head1 WINDOW-SIZE
 
@@ -1352,6 +1351,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.51/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.52/py/TermClui.py
 
 =cut

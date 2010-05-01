@@ -48,6 +48,7 @@ my $festival     = which('festival');
 my $lame         = which('lame');
 my $man          = which('man');
 my $mkisofs      = which('mkisofs') || which ('genisoimage');
+my $mediainfo    = which('dvd+rw-mediainfo');
 my $mpg123       = which('mpg123');
 my $mplayer      = which('mplayer');
 my $normalize    = which('normalize') || which ('normalize-audio');
@@ -69,7 +70,7 @@ while (1) {
 		warn "You'll need to be superuser ...\n";
 		system "$su root -c $0"; exit 0;
 	} elsif ($task eq 'burn WAV->AudioCD')  { burn_wav();
-	} elsif ($task eq 'burn MP3->MP3CD')    { burn_mp3();
+	} elsif ($task eq 'burn files->DataCD') { burn_files();
 	} elsif ($task eq 'change Directory')   { changedir();
 	} elsif ($task eq 'configure Timidity') { configure_timidity();
 	} elsif ($task eq 'connect MIDIports')  { connect_midi_ports();
@@ -140,12 +141,60 @@ sub burn_wav {
 	speak("finished burning the C D");
 	if ($eject) { system $eject; }
 }
-sub burn_mp3 {
+sub burn_files {
+	my $ok = 1;
 	if (! $mkisofs)  {
 		sorry("you need to install mkisofs or genisoimage.");  return;
 	}
 	if (!$cdrecord) {sorry("you need to install cdrecord or wodim."); return;}
-	sorry("burn_mp3 isn't implemented yet");
+	if (! -e '/dev/cdrom') { sorry("can't find /dev/cdrom"); $ok = 0;
+	} elsif (! -w '/dev/cdrom') { sorry("can't write to /dev/cdrom"); $ok=0;
+	}
+	my $tmpfile = "/tmp/cd_$$";
+	my $tmp_dir = "/tmp/mnt_$$";
+	if (! mkdir $tmp_dir) { sorry("can't mkdir $tmp_dir: $!"); $ok=0; }
+	return unless $ok;
+	# must choose_files repeatedly to within size limit
+	my $max_mb = 670;
+	while (1) {
+		my $mb_so_far = `du -ms $tmp_dir`; $mb_so_far =~ s/\s.*$//;
+		my $remaining = $max_mb - $mb_so_far;
+		if ($remaining > 1) {
+			warn "$remaining Mb remaining:\n";
+			my $f = select_file(-SelDir=>1, -Title=>"looking");
+			if (! $f) { last;
+			} elsif (-d $f) { system("cp","-R",$f,"$tmp_dir/");
+			} else { system("cp",$f,"$tmp_dir/");
+			}
+		} elsif ($remaining < 0) {
+			my $f = select_file(-SelDir=>1,
+			 -Title=>"$remaining Mb remaining: Delete which file ");
+			if (! $f) { last;
+			} else { system("rm","-rf","$tmp_dir/$f");
+			}
+		}
+	}
+
+	system "ls -lR $tmp_dir/*";
+	# suppress line-feeds in the progress-bar (on stderr) ...
+	system "$mkisofs -gui -r -J -T -allow-limited-size"
+	 ." -V DataCD -o $tmpfile $tmp_dir 2>&1 | perl -pe 's/\$/\\e[K\\e[A/'";
+	print "\n";
+	# if ($eject) { system $eject; }
+	system("rm","-rf",$tmp_dir);
+	# could mount -o loop $tmpfile and check it's OK ...
+	if ($eject) { system $eject; }
+	while (1) {
+		speak("insert a blank C D into the drive, and press Return");
+		ask("insert blank CD into drive and press Return...");
+		# suppress line-feeds in the progress-bar (on stderr) ...
+		# should sleep, try, sleep, retry up to about 15 sec ...
+		system "$cdrecord dev=/dev/cdrom -v -dao $tmpfile";
+		if ($eject) { system $eject; }
+		speak("finished copying C D");
+		last unless confirm "do you want to write that to another CD ?";
+	}
+	if (!unlink $tmpfile) { warn "can't unlink $tmpfile: $!\n"; }
 }
 sub copy_cd {
 	my $ok = 1;
@@ -227,7 +276,6 @@ sub copy_dvd {
 	if (!unlink $tmpfile) { warn "can't unlink $tmpfile: $!\n"; }
 }
 sub dvd_size {
-	my $mediainfo = which('dvd+rw-mediainfo');
 	if (!$mediainfo) {
 		# could try some other program ?
 		sorry('you should install dvd+rw-mediainfo'); return undef;
@@ -658,7 +706,7 @@ sub man {
 	my @topics = @_ || (
 	 'aconnect', 'alsamixer', 'aplaymidi', 'arecordmidi', 'atacontrol',
 	 'audio_stuff', 'bristol', 'burncd',
-	 'cdcontrol', 'cdda2wav',  'cdrecord',
+	 'cdcontrol', 'cdda2wav',  'cdrecord', 'dvd+rw-mediainfo',
 	 'File::Format::RIFF',
 	 'genisoimage', 'icedax', 'lame', 'mencoder', 'mkisofs',
 	 'mplayer', 'normalize', 'normalize-audio', 'pciconf', 'sndfile-play',
@@ -728,7 +776,7 @@ sub set_cdda_device {
 
 sub tasks {
 	my @tasks = (
-		'run a Bristol synth', 'burn MP3->MP3CD', 'burn WAV->AudioCD',
+		'run a Bristol synth', 'burn files->DataCD', 'burn WAV->AudioCD',
 		'change Directory', 'configure Timidity', 'connect MIDIports',
 		'convert MIDI->MP3', 'convert MIDI->WAV', 'convert Muscript->MIDI',
 		'copy audio CD', 'copy video DVD', 'decode MP3->WAV',
@@ -800,7 +848,7 @@ into one ArrowKey-and-Return user-interface,
 
 =head1 FEATURES
 
-  burn MP3->MP3CD     burn WAV->AudioCD     change Directory
+  burn files->DataCD  burn WAV->AudioCD     change Directory
   configure Timidity  connect MIDIports     consult Manual
   convert MIDI->MP3   convert MIDI->WAV     convert Muscript->MIDI
   copy audio CD       copy video DVD        create Makefile

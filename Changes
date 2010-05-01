@@ -42,3 +42,4 @@
 20091104 1.44 ask() handles left-arrow at start of string
 20100426 1.50 &choose supports mouse !! and utf8 clues supported
 20100430 1.51 bug fixed: &ask accepts spaces
+20100501 1.52 disable debugging :-)
