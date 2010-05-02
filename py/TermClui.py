@@ -29,9 +29,9 @@ This user-interface can be intermixed with standard applications
 which write to STDOUT or STDERR, such as make, pgp, rcs etc.
 
 For the user, choose() uses either (since 1.50) the mouse; or arrow
-keys (or hjkl) and Return or q; also SpaceBar or Button3 for multiple
-choices.  confirm() expects y, Y, n or N.  In general, ctrl-L redraws
-the (currently active bit of the) screen.  edit() and view() use the
+keys (or hjkl) and Return or q; also SpaceBar for multiple choices.
+confirm() expects y, Y, n or N.  In general, ctrl-L redraws the
+(currently active bit of the) screen.  edit() and view() use the
 default EDITOR and PAGER if possible.  Window-size-changes are handled,
 though the screen only gets redrawn after the next keystroke (e.g. ctrl-L)
 
@@ -47,16 +47,16 @@ SET_ANY_EVENT_MOUSE and kmous (terminfo) sequences, which are supported
 by all xterm, rxvt, konsole, screen, linux, gnome and putty terminals.
 
 Download TermClui.py from  www.pjb.com.au/midi/free/TermClui.py  or
-from http://cpansearch.perl.org/src/PJB/Term-Clui-1.52/py/TermClui.py
+from http://cpansearch.perl.org/src/PJB/Term-Clui-1.53/py/TermClui.py
 and put it in your PYTHONPATH.  TermClui.py depends on Python3.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.52
+Term::Clui and Term::Clui::FileSelect.  This is version 1.53
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.52'
+VERSION = '1.53'
 
 # ------------------------ vt100 stuff -------------------------
 
@@ -330,7 +330,7 @@ def _leave_mouse_mode ():   # 1.50  # do we need this in Python?
     #_ttyin.close()
     #_ttyin  = open("/dev/tty", mode="r")
     print("\033[?1003l", end='', file=_ttyout)  # cancel SET_ANY_EVENT_MOUSE
-    #_ttyout.flush()
+    _ttyout.flush()
     _IsMouseMode = False
     return 1
 
@@ -356,6 +356,9 @@ def _initscr(mouse_mode=False):  # needed for 1.50
 
     _ttyout = open("/dev/tty", mode="w")
 
+    signal.signal(1, _cleanup)
+    signal.signal(3, _cleanup)
+    signal.signal(15, _cleanup)
     if mouse_mode:
         #_ttyin  = open("/dev/tty", mode="rb", buffering=0)
         _ttyin  = open("/dev/tty", mode="r")
@@ -388,9 +391,19 @@ def _ttyin_read():
 def _ttyin_readline():
     global _ttyin
     return _ttyin.readline()[:-1][:1]
+def _cleanup(num,frame):
+    import tty
+    global _ttyout, _ttyout_fnum, _old_tcattr
+    print("\033[0m", end='', file=_ttyout)
+    _leave_mouse_mode()
+    _ttyout_fnum = _ttyout.fileno()
+    tty.setcbreak(_ttyout_fnum)
+    termios.tcsetattr(_ttyout_fnum, termios.TCSANOW, _old_tcattr)
+    # raise KeyboardInterrupt
+    sys.exit()
 
 def _endwin():
-    global _ttyout, tty,_ttyout_fnum,_old_tcattr, _InitscrAlreadyRun
+    global _ttyout, _old_tcattr, _InitscrAlreadyRun
     global _IsMouseMode, _WasMouseMode
     print("\033[0m", end='', file=_ttyout)
     if _InitscrAlreadyRun > 1:
@@ -409,9 +422,10 @@ def _endwin():
             _enter_mouse_mode()
         _InitscrAlreadyRun-=1
         return
-    if _ttyout_fnum:
-       termios.tcsetattr(_ttyout_fnum, termios.TCSANOW, _old_tcattr)
-    # tty.setcbreak()
+    import tty
+    _ttyout_fnum = _ttyout.fileno()
+    tty.setcbreak(_ttyout_fnum)
+    termios.tcsetattr(_ttyout_fnum, termios.TCSANOW, _old_tcattr)
     _InitscrAlreadyRun = 0
 
 # ----------------------- size handling ----------------------
@@ -460,6 +474,7 @@ def ask_password(question):
     ask(question)
 
 def ask(question, default=''):
+  try:
     r'''Prints the question and, on the same line, expects the user
 to input a string. Left- and Right-arrow and Backspace work
 as usual, ctrl-B goes to the beginning and ctrl-E to the end.
@@ -546,6 +561,11 @@ ask() returns the string when the user presses Enter.
     _endwin()
     _silent = False
     return "".join(s_a)
+  except:
+    # print("handling ask exception")
+    _endwin()
+    subprocess.call(['stty','sane'])
+    sys.exit()
 
 # ----------------------- choose stuff -------------------------
 def _debug(string):
@@ -566,6 +586,7 @@ _choice    = ''
 _list      = []
 
 def choose(question, a_list, multichoice=False):
+  try:
     r'''
 Prints the question, then a compact formatting of the list of strings
 with one (the cursor) highlit. Initially, the cursor is on that string
@@ -810,6 +831,12 @@ pressed is also selected), and choose() returns a list of strings.
 
     _endwin()
     print("choose: shouldn't reach here ...\n", file=sys.stderr)
+  except:
+    # print("handling exception")
+    _leave_mouse_mode()
+    _endwin()
+    subprocess.call(['stty','sane'])
+    return ''
 
 def _layout(my_list):
     global _irow_a, _icol_a, _this_cell, _maxcols, _maxrows, _choice

@@ -1,4 +1,4 @@
-#! /usr/local/bin/python3
+#! /usr/bin/python3
 
 #########################################################################
 #       This Python script is Copyright (c) 2002, Peter J Billam        #
@@ -20,7 +20,8 @@ def main():
         task = choose('Test which TermClui.py function ?',
             ['ask','choose','confirm','edit','view','select_file']
         );
-        task or exit()
+        if not task:
+            sys.exit()
         eval('test_'+task+'()')
 
 def test_choose():
@@ -123,7 +124,8 @@ with multi-line questions; subsequent lines after the initial
 question should be formatted within the window width ...
 
 You should check ctrl-B (to beginning), ctrl-E (to end),
-backspace, left and right arrows, and ctrl-C (clear) ...
+backspace, left and right arrows, and ctrl-C (clear),
+but currently here in the Python version ctrl-C doesn't work...
 '''
     string = ask(multiline_question)
 

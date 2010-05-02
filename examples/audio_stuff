@@ -161,13 +161,13 @@ sub burn_files {
 		my $remaining = $max_mb - $mb_so_far;
 		if ($remaining > 1) {
 			warn "$remaining Mb remaining:\n";
-			my $f = select_file(-SelDir=>1, -Title=>"looking");
+			my $f = select_file(SelDir=>1,-Title=>"looking");
 			if (! $f) { last;
-			} elsif (-d $f) { system("cp","-R",$f,"$tmp_dir/");
+			} if (-d $f) { system("cp","-R",$f,"$tmp_dir/");
 			} else { system("cp",$f,"$tmp_dir/");
 			}
 		} elsif ($remaining < 0) {
-			my $f = select_file(-SelDir=>1,
+			my $f = select_file(-TopDir=>$tmp_dir -SelDir=>1,
 			 -Title=>"$remaining Mb remaining: Delete which file ");
 			if (! $f) { last;
 			} else { system("rm","-rf","$tmp_dir/$f");
@@ -176,7 +176,6 @@ sub burn_files {
 	}
 
 	system "ls -lR $tmp_dir/*";
-	# suppress line-feeds in the progress-bar (on stderr) ...
 	system "$mkisofs -gui -r -J -T -allow-limited-size"
 	 ." -V DataCD -o $tmpfile $tmp_dir 2>&1 | perl -pe 's/\$/\\e[K\\e[A/'";
 	print "\n";

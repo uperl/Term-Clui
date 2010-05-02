@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.52';   # mouse works within choose()
+$VERSION = '1.53';   # mouse works within choose()
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -1094,9 +1094,9 @@ There is an associated file selector, Term::Clui::FileSelect
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.52/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.53/py/TermClui.py
 
-This is Term::Clui.pm version 1.52
+This is Term::Clui.pm version 1.53
 
 =head1 WINDOW-SIZE
 
@@ -1351,6 +1351,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.52/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.53/py/TermClui.py
 
 =cut
