@@ -44,3 +44,4 @@
 20100430 1.51 bug fixed: &ask accepts spaces
 20100501 1.52 disable debugging :-)
 20100502 1.53 TermClui.py does stty sane on return; bug fixed in audio_stuff
+20100504 1.54 help_text() introduced; Delete works in ask; various bugs fixed

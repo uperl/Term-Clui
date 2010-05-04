@@ -80,7 +80,7 @@ def test_choose():
     if not multi:
         return False
     if (multi == 'Single-choice'):
-        paint = choose ("Your favourite paint ?", paints)
+        paint = choose ("Your favourite paint ?\n"+help_text(''), paints)
         scientist = choose ("Your favourite scientist ?", scientists)
         multiline_question = r'''Your favourite colour ?
 
@@ -92,7 +92,7 @@ The other lines should only get displayed if there is room.
         colour = choose (multiline_question, colours);
         print('paint='+str(paint)+', scientist='+str(scientist)+', colour='+str(colour))
     else:
-        fav_paints = choose("Your favourite paints ?", paints, multichoice=True);
+        fav_paints = choose("Your favourite paints ?\n"+help_text('multi'), paints, multichoice=True);
         fav_scientists = choose("Your favourite scientists ?", scientists, multichoice=True);
         print("paints = "+', '.join(fav_paints) +
             "\nscientists = "+', '.join(fav_scientists))
@@ -123,11 +123,8 @@ The point of this test is to check out the behaviour of &ask
 with multi-line questions; subsequent lines after the initial
 question should be formatted within the window width ...
 
-You should check ctrl-B (to beginning), ctrl-E (to end),
-backspace, left and right arrows, and ctrl-C (clear),
-but currently here in the Python version ctrl-C doesn't work...
 '''
-    string = ask(multiline_question)
+    string = ask(multiline_question+help_text('ask'))
 
     colours = ['Red','Orange','Black','Grey','Blue']
     colour = choose('Your favourite colour ?', colours)

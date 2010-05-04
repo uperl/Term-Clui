@@ -8,11 +8,11 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.53';   # mouse works within choose()
+$VERSION = '1.54';   # help_text(), Delete in ask(), various bugs
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw(ask_password ask confirm choose edit sorry view inform);
+@EXPORT = qw(ask_password ask confirm choose help_text edit sorry view inform);
 @EXPORT_OK = qw(beep tiview back_up get_default set_default timestamp);
 %EXPORT_TAGS = (ALL => [@EXPORT,@EXPORT_OK]);
 
@@ -45,6 +45,8 @@ $KEY_LEFT  = 0404;
 $KEY_RIGHT = 0405;
 $KEY_DOWN  = 0402;
 $KEY_ENTER = "\r";
+$KEY_INSERT = 0525;
+$KEY_DELETE = 0524;
 $KEY_PPAGE = 0523;
 $KEY_NPAGE = 0522;
 $KEY_BTAB  = 0541;
@@ -52,7 +54,7 @@ my $AbsCursX = 0; my $AbsCursY = 0; my $TopRow = 0; my $CursorRow;
 my $LastEventWasPress = 0;  # in order to ignore left-over button-ups
 my %SpecialKey = map { $_, 1 } (   # 1.51, used by ask to ignore these
 	$KEY_UP, $KEY_LEFT, $KEY_RIGHT, $KEY_DOWN,
-	$KEY_PPAGE, $KEY_NPAGE, $KEY_BTAB
+	$KEY_PPAGE, $KEY_NPAGE, $KEY_BTAB, $KEY_INSERT, $KEY_DELETE
 );
 
 my $irow; my $icol;   # maintained by &puts, &up, &down, &left and &right
@@ -106,6 +108,8 @@ sub getch {
 		if ($c eq 'B') { return($KEY_DOWN); }
 		if ($c eq 'C') { return($KEY_RIGHT); }
 		if ($c eq 'D') { return($KEY_LEFT); }
+		if ($c eq '2') { getc_wrapper(0); return($KEY_INSERT); }
+		if ($c eq '3') { getc_wrapper(0); return($KEY_DELETE); } # 1.54
 		if ($c eq '5') { getc_wrapper(0); return($KEY_PPAGE); }
 		if ($c eq '6') { getc_wrapper(0); return($KEY_NPAGE); }
 		if ($c eq 'Z') { return($KEY_BTAB); }
@@ -138,7 +142,9 @@ sub getch {
 			}
 			if ($c =~ /\d/) { my $c1 = getc_wrapper(0);
 				if ($c1 eq '~') {
-					if ($c eq '5') { return($KEY_PPAGE);
+					if ($c eq '2') { return($KEY_INSERT);
+					} elsif ($c eq '3') { return($KEY_DELETE);
+					} elsif ($c eq '5') { return($KEY_PPAGE);
 					} elsif ($c eq '6') { return($KEY_NPAGE);
 					}
 				} else {   # cursor-position report, response to \e[6n
@@ -357,6 +363,12 @@ sub ask { my ($question, $default) = @_;
 			if ($i > 0) { $i--; &left(1); }  # 1.44
 		} elsif ($c == $KEY_RIGHT) {
 			if ($i < $n) { &puts($silent ? "x" : $s[$i]); $i++; }
+		} elsif ($c == $KEY_DELETE) {  # 1.54
+			if ($i < $n) {
+			 	$n--; splice(@s, $i, 1);
+			  	foreach $j ($i .. $n) { &puts($s[$j]); }
+			  	&clrtoeol(); &left($n-$i);
+			}
 		} elsif (($c eq "\cH") || ($c eq "\c?")) {
 			if ($i > 0) {
 			 	$n--; $i--; splice(@s, $i, 1); &left(1);
@@ -570,6 +582,8 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 			#} elsif ($this_cell < $#list) {
 			#	$this_cell++; &wr_cell($this_cell-1); &wr_cell($this_cell); 
 			}
+		} elsif ($c eq "?") {
+			warn "help\r\n";
 		}
 	}
 	&endwin();
@@ -604,9 +618,7 @@ sub wr_cell { my $i = shift;
 	if ($i == $this_cell) { &attrset($A_REVERSE); }
 	my $no_tabs = $list[$i];
 	$no_tabs =~ s/\t/ /g;
-	# $no_tabs =~ s/^(.{1,77}).*/$1/;  # whadyamean, 77 ? substr ?
-	$no_tabs = substr $no_tabs, $[, $maxcols-1;  # 1.42
-	&puts(" $no_tabs ");
+	&puts(substr " $no_tabs ", $[, $maxcols);  # 1.42, 1.54
 	if ($marked[$i] || $i == $this_cell) { &attrset($A_NORMAL); }
 }
 sub size_and_layout {
@@ -773,6 +785,18 @@ sub handle_mouse { my ($x, $y, $button_pressed, $button_drag) = @_;  # 1.50
 		&wr_cell($t); &wr_cell($this_cell); 
 	}
 	return $return_char;
+}
+sub help_text { # 1.54
+	my $text;
+	if ($_[$[] eq 'ask') {
+		return "\nLeft and Right arrowkeys, Backspace, Delete;"
+		 . " ctrl-B = beginning; ctrl-E = end; ctrl-X = clear; then Return.";
+	}
+	$text = "\nmove around with Mouse or Arrowkeys (or hjkl);";
+	if ($_[$[] =~ /^mult/) {
+		$text .= " multiselect with Rightclick or Spacebar;";
+	}
+	$text .= " then either q for quit, or choose with Leftclick or Return.";
 }
 
 # ----------------------- confirm stuff -------------------------
@@ -993,7 +1017,7 @@ sub fmt { my $text = shift; my %options = @_;
 		$last_line_empty = 0;
 
 		if ($options{nofill}) {
-			push @o_lines, substr($i_line, $[, $maxcols); next;
+			push @o_lines, substr($i_line, $[, $maxcols-1); next;
 		}
 		if ($i_line =~ s/^(\s+)//) {   # line begins with space ?
 			$initial_space = $1; $initial_space =~ s/\t/   /g;
@@ -1006,12 +1030,12 @@ sub fmt { my $text = shift; my %options = @_;
 		@i_words = split(' ', $i_line);
 		foreach $i_word (@i_words) {
 			$w_length = length $i_word;
-			if (($o_length + $w_length) > $maxcols) {
+			if (($o_length + $w_length) >= $maxcols) {
 				push @o_lines, $o_line;
 				$o_line = $initial_space; $o_length = length $initial_space;
 			}
-			if ($w_length > $maxcols) {  # chop it !
-				push @o_lines, substr($i_word,$[,$maxcols); next;
+			if ($w_length >= $maxcols) {  # chop it !
+				push @o_lines, substr($i_word,$[,$maxcols-1); next;
 			}
 			if ($o_line) { $o_line .= ' '; $o_length += 1; }
 			$o_line .= $i_word; $o_length += $w_length;
@@ -1045,6 +1069,7 @@ Term::Clui.pm - Perl module offering a Command-Line User Interface
  @chosen = choose("A Title", @a_list);  # multiple choice
  # multi-line question-texts are possible...
  $x = choose("Which ?\n(Mouse, or Arrow-keys and Return)", @w);
+ $x = choose("Which ?\n".help_text(), @w);
 
  if (confirm($text)) { do_something(); };
 
@@ -1094,9 +1119,9 @@ There is an associated file selector, Term::Clui::FileSelect
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.53/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.54/py/TermClui.py
 
-This is Term::Clui.pm version 1.53
+This is Term::Clui.pm version 1.54
 
 =head1 WINDOW-SIZE
 
@@ -1189,7 +1214,6 @@ You should therefore try to arrange multi-line questions
 so that the first line is the question in short form,
 and subsequent lines are explanation and elaboration.
 
-
 =item I<confirm>( $question );
 
 Asks the question, takes "y", "n", "Y" or "N" as a response.
@@ -1224,6 +1248,18 @@ Otherwise it uses a simple built-in routine which expects either "q"
 or I<Return> from the user; if the user presses I<Return>
 the displayed text remains on the screen and the dialogue continues
 after it, if the user presses "q" the text is erased.
+
+=item I<help_text>( $mode );
+
+This returns a short help message for the user.
+If I<mode> is "ask" then the text describes the keys the user has available
+when responding to an I<&ask> question;
+If I<mode> is "multi" then then the text describes the keys
+and mouse actions the user has available
+when responding to a multiple-choice I<&choose> question;
+Otherwise, the the text describes the keys
+and mouse actions the user has available
+when responding to a single-choice I<&choose>.
 
 =back
 
@@ -1351,6 +1387,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.53/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.54/py/TermClui.py
 
 =cut

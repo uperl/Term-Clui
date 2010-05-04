@@ -123,7 +123,7 @@ sub test_choose {
 	my $multi = &choose('Mode ?', 'Single-choice', 'Multi-choice');
 	return unless $multi;
 	if ($multi eq 'Single-choice') {
-		$paint = &choose("Your favourite paint ?", @paints);
+		$paint = &choose("Your favourite paint ?\n".help_text(), @paints);
 		my $scientist = &choose("Your favourite scientist ?", @scientists);
 		$colour = &choose(<<'EOT', @colours);
 Your favourite colour ?
@@ -135,7 +135,8 @@ The other lines should only get displayed if there is room.
 EOT
 		warn "paint=$paint, scientist=$scientist, colour=$colour\n";
 	} else {
-		my @fav_paints = &choose("Your favourite paints ?",@paints);
+		my @fav_paints
+		 = &choose("Your favourite paints ?\n".help_text('multi'),@paints);
 		my @fav_scientists = &choose("Your favourite scientists ?",@scientists);
 		warn "paints = ".join(', ',@fav_paints) .
 			"\nscientists = ".join(', ',@fav_scientists)."\n";
@@ -157,16 +158,14 @@ EOT
 }
 
 sub test_ask {
-	my $string = &ask(<<EOT,);
+	my $question = <<EOT;
 Enter a string :
 
 The point of this test is to check out the behaviour of &ask
 with multi-line questions; subsequent lines after the initial
 question should be formatted within the window width ...
-
-You should check ctrl-B (to beginning), ctrl-E (to end),
-backspace, left and right arrows, and ctrl-C (clear) ...
 EOT
+	my $string = &ask($question.help_text('ask'));
 
 	my @colours = ('Red','Orange','Black','Grey','Blue');
 	$colour = &choose('Your favourite colour ?', @colours);

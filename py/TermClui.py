@@ -6,6 +6,7 @@ a Python3 module offering a Command-Line User Interface
  chosen = choose("A Title", a_list);  # single choice
  chosen = choose("A Title", a_list, multichoice=True)  # multiple choice
  x = choose("Which ?\n(Mouse, or Arrow-keys and Return)", w) # multi-line q
+ x = choose("Which ?\n"+help_text(), w)    # built-in help_text
  confirm(text) and do_something()
  answer = ask(question)
  answer = ask(question, suggestion)
@@ -47,16 +48,16 @@ SET_ANY_EVENT_MOUSE and kmous (terminfo) sequences, which are supported
 by all xterm, rxvt, konsole, screen, linux, gnome and putty terminals.
 
 Download TermClui.py from  www.pjb.com.au/midi/free/TermClui.py  or
-from http://cpansearch.perl.org/src/PJB/Term-Clui-1.53/py/TermClui.py
+from http://cpansearch.perl.org/src/PJB/Term-Clui-1.54/py/TermClui.py
 and put it in your PYTHONPATH.  TermClui.py depends on Python3.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.53
+Term::Clui and Term::Clui::FileSelect.  This is version 1.54
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.53'
+VERSION = '1.54'
 
 # ------------------------ vt100 stuff -------------------------
 
@@ -69,6 +70,8 @@ _KEY_LEFT  = 0o404
 _KEY_RIGHT = 0o405
 _KEY_DOWN  = 0o402
 _KEY_ENTER = "\r"
+_KEY_INSERT = 0o525
+_KEY_DELETE = 0o524
 _KEY_PPAGE = 0o523
 _KEY_NPAGE = 0o522
 _KEY_BTAB  = 0o541
@@ -79,7 +82,8 @@ _AbsCursX = 0
 _AbsCursY = 0
 _TopRow = 0
 _CursorRow = 0
-_LastEventWasPress = 0   # in order to ignore left-over button-ups
+_LastEventWasPress = False
+# _SpecialKey unneeded - we test for class int
 
 _irow = 0   # maintained by _puts, _up, _down, _left and _right
 _icol = 0
@@ -181,6 +185,12 @@ def _getch():
             return _KEY_RIGHT 
         if (c == 'D'):
             return _KEY_LEFT 
+        if (c == '2'):
+            _getc_wrapper(0)
+            return _KEY_INSERT
+        if (c == '3'):
+            _getc_wrapper(0)
+            return _KEY_DELETE
         if (c == '5'):
             _getc_wrapper(0)
             return _KEY_PPAGE 
@@ -227,6 +237,10 @@ def _getch():
             if re.search('\d', c) != None:
                 c1 = _getc_wrapper(0)
                 if c1 == '~':
+                    if c == '2':
+                        return _KEY_INSERT
+                    if c == '3':
+                        return _KEY_DELETE
                     if c == '5':
                         return _KEY_PPAGE 
                     if c == '6':
@@ -448,8 +462,8 @@ def _check_size():
     _maxcols -= 1
 
     if _notherlines:
-        _otherlinesarray = _fmt(_otherlines)
-        _notherlines = len(_otherlinesarray)
+        _otherlines_a = _fmt(_otherlines)
+        _notherlines = len(_otherlines_a)
     _size_changed = False;
 
 # $SIG{'WINCH'} = sub { $size_changed = 1; };
@@ -515,6 +529,15 @@ ask() returns the string when the user presses Enter.
         elif c == _KEY_RIGHT and i < n:
             _puts('x') if _silent else _puts(s_a[i])
             i+=1
+        elif c == _KEY_DELETE and i < n:
+             n -= 1
+             s_a.pop(i)   # splice(@s, $i, 1)
+             j = i
+             while j < n:
+                 _puts(s_a[j])
+                 j += 1
+             _clrtoeol()
+             _left(n-i)
         elif (c == "\b") or (c == "\177"):
             if i > 0:
                  n -= 1
@@ -527,7 +550,7 @@ ask() returns the string when the user presses Enter.
                      j += 1
                  _clrtoeol()
                  _left(n-i)
-        elif c == "\003" or c == "\030" or c == "\004":  # clear ...
+        elif c == "\030" or c == "\004":  # clear ...
             _left(i)
             i = 0
             n = 0
@@ -605,7 +628,7 @@ pressed is also selected), and choose() returns a list of strings.
 '''
     # wantarray doesn't exist in Python because no $ or @
     global _maxcols, _marked, _list, _size_changed, _nrows, _icol_a, _irow_a
-    global _irow
+    global _irow, _otherlines, _notherlines, _otherlines_a
     global _ttyout, _this_cell, _clue_has_been_given, _choice, _CursorRow
     _list = a_list
     for i in range(len(_list)):
@@ -616,7 +639,8 @@ pressed is also selected), and choose() returns a list of strings.
     question = re.sub('[\r\n]+$', '', question)
     question = re.sub('^[\r\n]+', '', question)
 
-    otherlines_a = []
+    _otherlines = ''
+    _otherlines_a = []
     lines = re.split('\r?\n', question, 1)
     firstline = lines[0]
     firstlinelength = len(firstline)
@@ -625,11 +649,12 @@ pressed is also selected), and choose() returns a list of strings.
     _initscr(mouse_mode=True)
     _size_and_layout(0)
     if (len(lines) > 1):
-       otherlines_a = _fmt(lines[1])
+       _otherlines = lines[1]
+       _otherlines_a = _fmt(lines[1])
     #if len(otherlines_a):
     #    puts("\r\n" + "\r\n".join(otherlines_a) + "\r")
     #    goto(1+len(firstline), 0)
-    _notherlines = len(otherlines_a)
+    _notherlines = len(_otherlines_a)
     if multichoice:
         if (firstlinelength < _maxcols-30):
             _puts(firstline+" (multiple choice with spacebar)")
@@ -831,7 +856,7 @@ pressed is also selected), and choose() returns a list of strings.
 
     _endwin()
     print("choose: shouldn't reach here ...\n", file=sys.stderr)
-  except:
+  except KeyboardInterrupt:
     # print("handling exception")
     _leave_mouse_mode()
     _endwin()
@@ -867,14 +892,13 @@ def _layout(my_list):
 
 def _wr_screen():
     global _otherlines, _notherlines, _nrows, _maxrows, _list, _this_cell
-
     i = 0
     while (i < len(_list)):
         if not  i == _this_cell:
             _wr_cell(i)
         i += 1
     if (_notherlines and (_nrows+_notherlines) < _maxrows):
-        _puts("\r\n" + "\r\n".join(_otherlines) + "\r")
+        _puts("\r\n" + "\r\n".join(_otherlines_a) + "\r")
     _wr_cell(_this_cell)
 
 def _wr_cell(i):
@@ -887,8 +911,8 @@ def _wr_cell(i):
         _attrset(_A_REVERSE)
     no_tabs = _list[i]
     no_tabs = re.sub("\t", " ", no_tabs)
-    no_tabs = no_tabs[:_maxcols-1]  # 1.42
-    _puts(" " + no_tabs + " ")
+    no_tabs = " " + no_tabs + " "
+    _puts(no_tabs[:_maxcols])  # 1.42, 1.54
     if _marked[i] or (i == _this_cell):
         _attrset(_A_NORMAL)
 
@@ -1123,10 +1147,10 @@ def _handle_mouse(x, y, button_pressed, button_drag):  # 1.50
     # if xterm doesn't receive a button-up event it thinks it's dragging
     return_char = ''
     if button_pressed == 1 and not button_drag:
-        _LastEventWasPress = 1
+        _LastEventWasPress = True
         return_char = _KEY_ENTER
     elif button_pressed == 3 and not button_drag:
-        _LastEventWasPress = 1
+        _LastEventWasPress = True
         return_char = ' '
     if i != _this_cell:
         t = _this_cell
@@ -1134,6 +1158,7 @@ def _handle_mouse(x, y, button_pressed, button_drag):  # 1.50
         _wr_cell(t)
         _wr_cell(_this_cell)
     return return_char
+
 
 # ----------------------- confirm stuff -------------------------
 
@@ -1522,6 +1547,25 @@ def _tiview(title='', text=''):
     print("_tiview: shouldn't reach here\n", file=sys.stderr)
     return False
 
+# ----------------------- help_text --------------------------
+
+def help_text(mode=''):
+    '''
+This returns a short help message for the user.  If mode is "ask" then
+the text describes the keys the user has available when responding to
+an ask() question;  If mode is "multi" then then the text describes the
+keys and mouse actions the user has available when responding to a
+multiple-choice choose() question;  Otherwise, the the text describes
+the keys and mouse actions the user has available when responding to
+a single-choice choose().
+'''
+    if mode == 'ask':
+        return "\nLeft and Right arrowkeys, Backspace, Delete; ctrl-B = beginning; ctrl-E = end; ctrl-X = clear; then Return."
+    text = "\nmove around with Mouse or Arrowkeys (or hjkl);"
+    if re.match('mult',mode):
+        text += " multiselect with Rightclick or Spacebar;"
+    text += " then either q for quit, or choose with Leftclick or Return."
+    return text
 # -------------------------- infrastructure -------------------------
 
 _OpenFile = 0
@@ -1610,7 +1654,7 @@ def _fmt(text, nofill=False):
         i_words = re.split(r'\s+', i_line)
         for i_word in i_words:
             w_length = len(i_word)
-            if ((o_length + w_length) > _maxcols):
+            if ((o_length + w_length) >= _maxcols):  # >= 1.54
                 o_lines.append(o_line)
                 o_line = initial_space
                 o_length = len(initial_space)
