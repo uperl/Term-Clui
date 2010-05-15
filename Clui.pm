@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.54';   # help_text(), Delete in ask(), various bugs
+$VERSION = '1.55';   # help_text(), Delete in ask(), various bugs
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -636,7 +636,7 @@ sub narrow_the_search { my @biglist = @_;
 	my $nchoices = scalar @_;
 	my $n; my $i; my @s; my $s; my @list = @biglist;
 	$clue_has_been_given = 1;
-	leave_mouse_mode();
+	if ($IsMouseMode) { leave_mouse_mode(); }
 	&ask_for_clue($nchoices, $i, $s);
 	while (1) {
 		$c = &getch();
@@ -1119,9 +1119,9 @@ There is an associated file selector, Term::Clui::FileSelect
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.54/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.55/py/TermClui.py
 
-This is Term::Clui.pm version 1.54
+This is Term::Clui.pm version 1.55
 
 =head1 WINDOW-SIZE
 
@@ -1387,6 +1387,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.54/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.55/py/TermClui.py
 
 =cut

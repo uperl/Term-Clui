@@ -48,16 +48,16 @@ SET_ANY_EVENT_MOUSE and kmous (terminfo) sequences, which are supported
 by all xterm, rxvt, konsole, screen, linux, gnome and putty terminals.
 
 Download TermClui.py from  www.pjb.com.au/midi/free/TermClui.py  or
-from http://cpansearch.perl.org/src/PJB/Term-Clui-1.54/py/TermClui.py
+from http://cpansearch.perl.org/src/PJB/Term-Clui-1.55/py/TermClui.py
 and put it in your PYTHONPATH.  TermClui.py depends on Python3.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.54
+Term::Clui and Term::Clui::FileSelect.  This is version 1.55
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.54'
+VERSION = '1.55'
 
 # ------------------------ vt100 stuff -------------------------
 
@@ -927,6 +927,7 @@ def _size_and_layout(erase_rows):
 
 def _narrow_the_search(a_list):
     global _maxrows, _nrows, _KEY_LEFT, _KEY_RIGHT, _clue_has_been_given
+    global _IsMouseMode
     nchoices = len(a_list)
     n = 0
     i = 0
@@ -934,7 +935,8 @@ def _narrow_the_search(a_list):
     s = ''
     my_list = a_list
     _clue_has_been_given = True
-    _leave_mouse_mode()
+    if _IsMouseMode:  # 1.55
+        _leave_mouse_mode()
     _ask_for_clue(nchoices, i, s);
     while True:
         c = _getch()
