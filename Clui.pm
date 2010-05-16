@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.55';   # help_text(), Delete in ask(), various bugs
+$VERSION = '1.56';   # help_text(), Delete in ask(), various bugs
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -375,7 +375,10 @@ sub ask { my ($question, $default) = @_;
 			  	foreach $j ($i .. $n) { &puts($s[$j]); }
 			  	&clrtoeol(); &left($n-$i);
 			}
-		} elsif ($c eq "\cC" || $c eq "\cX" || $c eq "\cD") {  # clear ...
+		} elsif ($c eq "\cC") {  # 1.56
+			&erase_lines(1); &endwin();
+			warn "^C\n"; kill('INT', $$); return undef;
+		} elsif ($c eq "\cX" || $c eq "\cD") {  # clear ...
 			&left($i); $i = 0; $n = 0; &clrtoeol(); @s = ();
 		} elsif ($c eq "\cB") { &left($i); $i = 0;
 		} elsif ($c eq "\cE") { &right($n-$i); $i = $n;
@@ -536,6 +539,9 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 				}
 			}
 			&wr_screen();
+		} elsif ($c eq "\cC") {  # 1.56
+			&erase_lines(1); &endwin();
+			warn "^C\n"; kill('INT', $$); return undef;
 		} elsif ($c eq "\r") {
 			&erase_lines(1); &goto($firstlinelength+1, 0);
 			my @chosen;
@@ -655,7 +661,10 @@ sub narrow_the_search { my @biglist = @_;
 			  	foreach $j ($i..$n) { &puts($s[$j]); }
 				&clrtoeol(); &left($n-$i);
 			}
-		} elsif ($c eq "\cC" || $c eq "\cX" || $c eq "\cD") {  # clear ...
+		} elsif ($c eq "\cC") {  # 1.56
+			&erase_lines(1); &endwin();
+			warn "^C\n"; kill('INT', $$); return undef;
+		} elsif ($c eq "\cX" || $c eq "\cD") {  # clear ...
 			if (! @s) {   # 20070305 ?
 				$clue_has_been_given = 0; &erase_lines(1); 
 				enter_mouse_mode(); return ();
@@ -806,7 +815,13 @@ sub confirm { my $question = shift;  # asks user Yes|No, returns 1|0
 	&initscr();
 	my $nol = &display_question($question); &puts(" (y/n) ");
 	while (1) {
-		$response=&getch();  last if ($response=~/[yYnN]/);  &beep();
+		$response=&getch();
+		if ($response eq "\cC") {  # 1.56
+			&erase_lines(1); &endwin();
+			warn "^C\n"; kill('INT', $$); return undef;
+		}
+		last if ($response=~/[yYnN]/);
+		&beep();
 	}
 	&left(6); &clrtoeol(); 
 	if ($response=~/^[yY]/) { &puts("Yes"); } else { &puts("No"); }
@@ -1119,9 +1134,9 @@ There is an associated file selector, Term::Clui::FileSelect
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.55/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.56/py/TermClui.py
 
-This is Term::Clui.pm version 1.55
+This is Term::Clui.pm version 1.56
 
 =head1 WINDOW-SIZE
 
@@ -1387,6 +1402,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.55/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.56/py/TermClui.py
 
 =cut
