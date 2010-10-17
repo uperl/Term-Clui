@@ -48,16 +48,16 @@ SET_ANY_EVENT_MOUSE and kmous (terminfo) sequences, which are supported
 by all xterm, rxvt, konsole, screen, linux, gnome and putty terminals.
 
 Download TermClui.py from  www.pjb.com.au/midi/free/TermClui.py  or
-from http://cpansearch.perl.org/src/PJB/Term-Clui-1.55/py/TermClui.py
+from http://cpansearch.perl.org/src/PJB/Term-Clui-1.57/py/TermClui.py
 and put it in your PYTHONPATH.  TermClui.py depends on Python3.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.55
+Term::Clui and Term::Clui::FileSelect.  This is version 1.57
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.55'
+VERSION = '1.57'
 
 # ------------------------ vt100 stuff -------------------------
 

@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.56';
+$VERSION = '1.60';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
@@ -102,13 +102,16 @@ sub select_file {   my %option = @_;
 		} else { $title = "in directory $dir ?";
 		}
 		if ($option{'-File'}) { &set_default($title, $option{'-File'}) }
+		$Term::Clui::SpeakMode{'dot'} = 1;
 		if ($multichoice) {
 			my @new = &choose ($title, @allfiles);
+			$Term::Clui::SpeakMode{'dot'} = 0;
 			return () unless @new;
 			foreach (@new) { $_="$dir$_"; }
 			return @new;
 		}
 		$new = &choose ($title, @allfiles);
+		$Term::Clui::SpeakMode{'dot'} = 0;
 
 		if ($option{'-ShowAll'} && $new eq 'Hide DotFiles') {
 			delete $option{'-ShowAll'}; redo;

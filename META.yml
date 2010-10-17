@@ -1,10 +1,14 @@
-# http://module-build.sourceforge.net/META-spec.html
+# http://module-build.sourceforge.net/META-spec-current.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Term-Clui
-version:      1.56
+version:      1.60
 version_from: Clui.pm
 installdirs:  site
 requires:
-
+  Term::ReadKey: 0
+recommends:
+  Term::Size: 0
+license:      perl
 distribution_type: module
 generated_by: /usr/bin/vim
+

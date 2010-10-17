@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.56';   # help_text(), Delete in ask(), various bugs
+$VERSION = '1.60';   # help_text(), Delete in ask(), various bugs
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -26,6 +26,23 @@ if ($@) {
 	$have_Term_Size = 1;
 	eval 'require "Term/Size.pm"';
 	if ($@) { $have_Term_Size = 0; }
+}
+
+my $Eflite;
+my $Eflite_FH;  # open here at top-level so one sub can silence the previous
+if ($ENV{'CLUI_SPEAK'} or $ENV{'EDITOR'} =~ /^emacspeak/) {
+	$Eflite = &which('eflite');
+	if ($Eflite) {
+		if (open($Eflite_FH,'|-',$Eflite)) {
+			select((select($Eflite_FH), $| = 1)[$[]); print $Eflite_FH q{};
+			eval 'sub END { close $Eflite_FH; }';
+		} else {
+			warn "can't run $Eflite: $!\n";
+		}
+	} else {
+		warn("Term::Clui warning: CLUI_SPEAK set"
+		. " or EDITOR=emacspeak; but can't find eflite\n");
+	}
 }
 
 # use open ':locale';  # the open pragma was introduced in 5.8.6
@@ -347,10 +364,13 @@ sub ask { my ($question, $default) = @_;
 
 	my $i = 0; my $n = 0; my @s = (); # cursor position, length, string
 	if ($default) {
+		&speak("$question, default is $default");
 		$default =~ s/\t/	/g;
 		@s = split(q{}, $default); $n = scalar @s; $i = $[;
 		foreach $j ($[ .. $n) { &puts($s[$j]); }
-		&left($n);
+		# &left($n);
+	} else {
+		&speak($question);
 	}
 
 	while (1) {
@@ -380,19 +400,21 @@ sub ask { my ($question, $default) = @_;
 			warn "^C\n"; kill('INT', $$); return undef;
 		} elsif ($c eq "\cX" || $c eq "\cD") {  # clear ...
 			&left($i); $i = 0; $n = 0; &clrtoeol(); @s = ();
-		} elsif ($c eq "\cB") { &left($i); $i = 0;
+		} elsif ($c eq "\cA") { &left($i); $i = 0;
 		} elsif ($c eq "\cE") { &right($n-$i); $i = $n;
-		} elsif ($c eq "\cL") {  # redraw ...
+		} elsif ($c eq "\cL") { &speak(join("", @s));  # redraw ...
 		} elsif ($SpecialKey{$c}) { &beep();
 		} elsif (ord($c) >= 32) {  # 1.51
 			splice(@s, $i, 0, $c);
 			&puts($silent ? "x" : $c);
+			if (! $silent) {  &speak($c); }
 			$n++; $i++;
 			foreach $j ($i .. $n) { &puts($s[$j]); }
 			&clrtoeol();  &left($n-$i);
 		} else { &beep();
 		}
 	}
+	if ($Eflite_FH) { &speak(join("", @s), 'wait'); }
 	&endwin(); $silent = q{}; return join("", @s);
 }
 
@@ -439,8 +461,14 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 		} else {
 			&puts("$firstline\n\r");
 		}
+		if ($nrows >= $maxrows) { &speak("$firstline, ", 'wait');
+		} else { &speak("$firstline, multiple choice, $list[$this_cell]");
+		}
 	} else {
 		&puts("$firstline\n\r");
+		if ($nrows >= $maxrows) { &speak("$firstline, ", 'wait');
+		} else { &speak("$firstline, choose, $list[$this_cell]");
+		}
 	}
 	if ($nrows >= $maxrows) {
 		@list = &narrow_the_search(@list);
@@ -448,6 +476,7 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 			&up(1); &clrtoeol(); &endwin(); $clue_has_been_given = 0;
 			return wantarray ? () : undef;
 		}
+		&speak("choose, $list[$this_cell]");
 	}
 	&wr_screen();
 	# the cursor is now on this_cell, not on the question
@@ -466,6 +495,7 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 				}
 			}
 			&wr_screen();
+			&speak("choose, $list[$this_cell]");
 		}
 		if ($c eq "q" || $c eq "\cD") {
 			&erase_lines(1);
@@ -474,7 +504,9 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 				&up(1); &clrtoeol();   # erase the confirm
 				if ($re_clue) {
 					$irow = 1;
-					@list = &narrow_the_search(@biglist); &wr_screen(); next;
+					@list = &narrow_the_search(@biglist); &wr_screen();
+					&speak("choose, $list[$this_cell]");
+					next;
 				} else {
 					&up(1); &clrtoeol(); &endwin(); $clue_has_been_given = 0;
 					return wantarray ? () : undef;
@@ -483,19 +515,19 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 			&goto(0,0); &clrtoeol(); &endwin(); $clue_has_been_given = 0;
 			return wantarray ? () : undef;
 		} elsif (($c eq "\t") && ($this_cell < $#list)) {
-			$this_cell++; &wr_cell($this_cell-1);
-			&wr_cell($this_cell); 
+			$this_cell++; &wr_cell($this_cell-1); &wr_cell($this_cell); 
+			&speak($list[$this_cell]);
 		} elsif ((($c eq "l") || ($c == $KEY_RIGHT)) && ($this_cell < $#list)
 			&& ($irow[$this_cell] == $irow[$this_cell+1])) {
-			$this_cell++; &wr_cell($this_cell-1);
-			&wr_cell($this_cell); 
+			$this_cell++; &wr_cell($this_cell-1); &wr_cell($this_cell); 
+			&speak($list[$this_cell]);
 		} elsif ((($c eq "\cH") || ($c == $KEY_BTAB)) && ($this_cell > $[)) {
-			$this_cell--; &wr_cell($this_cell+1);
-			&wr_cell($this_cell); 
+			$this_cell--; &wr_cell($this_cell+1); &wr_cell($this_cell); 
+			&speak($list[$this_cell]);
 		} elsif ((($c eq "h") || ($c == $KEY_LEFT)) && ($this_cell > $[)
 			&& ($irow[$this_cell] == $irow[$this_cell-1])) {
-			$this_cell--; &wr_cell($this_cell+1);
-			&wr_cell($this_cell); 
+			$this_cell--; &wr_cell($this_cell+1); &wr_cell($this_cell); 
+			&speak($list[$this_cell]);
 		} elsif ((($c eq "j") || ($c == $KEY_DOWN)) && ($irow < $nrows)) {
 			$mid_col = $icol[$this_cell] + 0.5 * length($list[$this_cell]);
 			$left_of_target = 1000;
@@ -511,6 +543,7 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 			if (($new_mid_col - $mid_col) > $left_of_target) { $inew--; }
 			$iold = $this_cell; $this_cell = $inew;
 			&wr_cell($iold); &wr_cell($this_cell);
+			&speak($list[$this_cell]);
 		} elsif ((($c eq "k") || ($c == $KEY_UP)) && ($irow > 1)) {
 			$mid_col = $icol[$this_cell] + 0.5*length($list[$this_cell]);
 			$right_of_target = 1000;
@@ -526,6 +559,7 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 			if (($mid_col - $new_mid_col) > $right_of_target) { $inew++; }
 			$iold = $this_cell; $this_cell = $inew;
 			&wr_cell($iold); &wr_cell($this_cell);
+			&speak($list[$this_cell]);
 		} elsif ($c eq "\cL") {
 			if ($size_changed) {
 				&size_and_layout($nrows);
@@ -575,8 +609,10 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 			&endwin();
 			&set_default($firstline, $list[$this_cell]); # join($,,@chosen) ?
 			$clue_has_been_given = 0;
-			if (wantarray) { return @chosen;
-			} else { return $list[$this_cell];
+			if (wantarray) {
+				&speak(join(' and ',@chosen), 'wait'); return @chosen;
+			} else {
+				&speak($list[$this_cell], 'wait'); return $list[$this_cell];
 			}
 		} elsif ($c eq " ") {
 			if (wantarray) {
@@ -584,6 +620,7 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 				#if ($this_cell < $#list) {
 					#  $this_cell++; &wr_cell($this_cell-1); # 1.50
 				&wr_cell($this_cell); 
+				&speak('marked');
 				#}
 			#} elsif ($this_cell < $#list) {
 			#	$this_cell++; &wr_cell($this_cell-1); &wr_cell($this_cell); 
@@ -619,11 +656,11 @@ sub wr_screen {
 	&wr_cell($this_cell);
 }
 sub wr_cell { my $i = shift;
+	my $no_tabs = $list[$i];
+	$no_tabs =~ s/\t/ /g;
 	&goto($icol[$i], $irow[$i]);
 	if ($marked[$i]) { &attrset($A_BOLD | $A_UNDERLINE); }
 	if ($i == $this_cell) { &attrset($A_REVERSE); }
-	my $no_tabs = $list[$i];
-	$no_tabs =~ s/\t/ /g;
 	&puts(substr " $no_tabs ", $[, $maxcols);  # 1.42, 1.54
 	if ($marked[$i] || $i == $this_cell) { &attrset($A_NORMAL); }
 }
@@ -670,7 +707,7 @@ sub narrow_the_search { my @biglist = @_;
 				enter_mouse_mode(); return ();
 			}
 			&left($i); $i = 0; $n = 0; @s = (); &clrtoeol();
-		} elsif ($c eq "\cB") { &left($i); $i = 0; next;
+		} elsif ($c eq "\cA") { &left($i); $i = 0; next;
 		} elsif ($c eq "\cE") { &right($n-$i); $i = $n; next;
 		} elsif ($c eq "\cL") {
 		} elsif ($SpecialKey{$c}) { &beep();
@@ -699,16 +736,19 @@ sub ask_for_clue { my ($nchoices, $i, $s) = @_;
 			my $headstr = "the choices won't fit; there are still";
 			&goto(0,1); &puts("$headstr $nchoices of them"); &clrtoeol();
 			&goto(0,2); &puts("lengthen the clue : "); &right($i);
+			&speak("still $nchoices choices, lengthen the clue");
 		} else {
 			my $headstr = "the choices won't fit; there are";
 			&goto(0,1); &puts("$headstr $nchoices of them"); &clrtoeol();
 			&goto(0,2);
-			&puts("   give me a clue :            (or ctrl-X to quit)");
+			&puts("   give me a clue :             (or ctrl-X to quit)");
 			&left(30);
+			&speak("$nchoices choices, give me a clue, or control-X to quit");
 		}
 	} else {
 		&goto(0,1); &puts("No choices fit this clue !"); &clrtoeol();
 		&goto(0,2); &puts(" shorten the clue : "); &right($i);
+		&speak("no choices fit, shorten the clue");
 	}
 }
 sub get_default { my ($question) = @_;
@@ -798,8 +838,8 @@ sub handle_mouse { my ($x, $y, $button_pressed, $button_drag) = @_;  # 1.50
 sub help_text { # 1.54
 	my $text;
 	if ($_[$[] eq 'ask') {
-		return "\nLeft and Right arrowkeys, Backspace, Delete;"
-		 . " ctrl-B = beginning; ctrl-E = end; ctrl-X = clear; then Return.";
+		return "\nLeft and Right arrowkeys, Backspace, Delete; control-A = "
+		 . " beginning; control-E = end; control-X = clear; then Return.";
 	}
 	$text = "\nmove around with Mouse or Arrowkeys (or hjkl);";
 	if ($_[$[] =~ /^mult/) {
@@ -814,6 +854,7 @@ sub confirm { my $question = shift;  # asks user Yes|No, returns 1|0
 	return(0) unless $question;  return(0) unless -t STDERR;
 	&initscr();
 	my $nol = &display_question($question); &puts(" (y/n) ");
+	&speak($question . ', y or n');
 	while (1) {
 		$response=&getch();
 		if ($response eq "\cC") {  # 1.56
@@ -824,7 +865,13 @@ sub confirm { my $question = shift;  # asks user Yes|No, returns 1|0
 		&beep();
 	}
 	&left(6); &clrtoeol(); 
-	if ($response=~/^[yY]/) { &puts("Yes"); } else { &puts("No"); }
+	if ($response=~/^[yY]/) {
+		&puts("Yes");
+		if ($Eflite_FH) { &speak('yess', 'wait'); }
+	} else {
+		&puts("No");
+		if ($Eflite_FH) { &speak('know', 'wait'); }
+	}
 	&erase_lines(1); &endwin();
 	if ($response =~ /^[yY]/) { return 1; } else { return 0 ; }
 }
@@ -927,6 +974,7 @@ sub timestamp {
 
 sub sorry { # warns user of an error condition
 	print STDERR "Sorry, $_[$[]\n";
+	&speak("Sorry, $_[$[]", 'wait');
 }
 sub inform { my $text = $_[$[];
 	$text =~ s/([^\n])$/$1\n/s;
@@ -934,6 +982,7 @@ sub inform { my $text = $_[$[];
 		print TTY $text; close TTY;
 	} else { warn $text;
 	}
+	&speak($text, 'wait');
 }
 
 # ----------------------- view stuff -------------------------
@@ -974,12 +1023,15 @@ sub tiview {	my ($title, $text) = @_;
 	my @rows = &fmt($text, nofill=>1);
 	&initscr();
 	if (3 > scalar @rows) {
-		&puts(join("\r\n",@rows), "\r\n"); &endwin(); return 1;
+		&puts("$title\r\n".join("\r\n",@rows), "\r\n");
+		&speak("$title, ".join(" ",@rows), 'wait');
+		&endwin(); return 1;
 	}
 	if ($titlelength > ($maxcols-35)) { &puts("$title\r\n");
 	} else { &puts("$title   (<enter> to continue, q to clear)\r\n");
 	}
 	&puts("\r", join("\e[K\r\n",@rows), "\r");
+	&speak("$title, enter to continue, ".join(" ",@rows));
 	$icol = 0; $irow = scalar @rows; &goto($titlelength+1, 0);
 	
 	while (1) {
@@ -997,6 +1049,32 @@ sub tiview {	my ($title, $text) = @_;
 }
 
 # -------------------------- infrastructure -------------------------
+
+sub which {
+	my $f;
+	foreach $d (split(":",$ENV{'PATH'})) {$f="$d/$_[$[]"; return $f if -x $f;}
+}
+%SpeakMode = ();
+sub speak {  my ($text, $wait) = @_;
+	return unless $Eflite_FH;
+	$text="$text";
+	return unless length($text);
+	# if ($Flite_PID) { kill 'TERM', $Flite_PID; }  $Flite_PID = fork();
+	# if ($Flite_PID == 0) { exec $Flite, '-voice', 'rms', '-t', $text; }
+	# system("$Flite -voice rms -t '$text' &"); }
+	if (length($text) == 1) {
+		print $Eflite_FH "s\nl {$text}\n";
+		if ($wait) { select(undef,undef,undef,0.5); }
+	} else {
+		# could replace the punctuation chars with their descriptive words...
+		if ($SpeakMode{'dot'}) {
+			$text =~ s/\s*\.\s*/ dot /g;
+		}
+		print $Eflite_FH "s\nq {$text}\nd\n";
+		# useless emacspeak output: tts_sy nc_state all 0 0  1 225\nq {[:np  ]}
+		if ($wait) { select(undef,undef,undef,0.3+0.07*length($text)); }
+	}
+}
 
 sub display_question {   my $question = shift; my %options = @_;
 	# used by &ask and &confirm, but not by &choose ...
@@ -1132,11 +1210,21 @@ I<linux>, I<gnome> and I<putty> terminals.
 
 There is an associated file selector, Term::Clui::FileSelect
 
+Since version 1.60, a speaking interface is provided
+for the visually-impaired user.
+It employs I<eflite>, which is also used by I<emacspeak>.
+Speech is turned on
+either if the I<EDITOR> environment variable is set to I<emacspeak>,
+or if the I<CLUI_SPEAK> environment variable is set to any non-empty string.
+Because Term::Clui's metaphor for the computer
+is a human-like conversation-partner, this works very naturally.
+The application needs no modification.
+
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.56/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.60/py/TermClui.py
 
-This is Term::Clui.pm version 1.56
+This is Term::Clui.pm version 1.60
 
 =head1 WINDOW-SIZE
 
@@ -1171,7 +1259,7 @@ If the optional second argument is present, it is offered to the user
 as a default.
 For the user, left and right arrow keys move backward and forward
 through the string, delete and backspace erase the previous character,
-ctrl-B moves to the beginning, ctrl-E to the end,
+ctrl-A moves to the beginning, ctrl-E to the end,
 and ctrl-C, ctrl-D or ctrl-X clear the current string.
 
 =item I<ask_password>( $question );
@@ -1332,6 +1420,12 @@ If either the LANG or the LC_TYPE environment variables
 contain the string I<utf8> or I<utf-8> (case insensitive),
 then I<choose()> and I<inform()> open I</dev/tty> with a I<utf8> encoding.
 
+If the environment variable I<CLUI_SPEAK> is set
+or if I<EDITOR> is set to I<emacspeak>,
+and if I<flite> is installed,
+then I<Term::Clui> will use I<flite>
+to speak its questions and choices out loud.
+
 I<Term::Clui> also consults the environment variables
 HOME, LOGDIR, EDITOR and PAGER, if they are set.
 
@@ -1399,9 +1493,11 @@ which were in turn based on some even older curses-based programs in I<C>.
  http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
  perl(1)
  http://www.cpan.org/SITES.html
+ festival(1)
+ emacspeak(1)
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.56/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.60/py/TermClui.py
 
 =cut

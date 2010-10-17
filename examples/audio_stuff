@@ -336,7 +336,8 @@ sub rip_wav {
 	$track = choose('Extract which track ?', @tracks);
 	$track =~ s/^\s*T0?//;
 	$track =~ s/:?\s+.*$//;
-	my $filename = ask('to what filename ?', "track$track.wav");
+	if ($track =~ /^\d$/) { $track = "0$track"; }
+	my $filename = ask('to what filename ?', "${track}_track.wav");
 	if ($filename && ($filename !~ /\.wav$/i)) { $filename .= '.wav'; }
 
 	if ($track) {
