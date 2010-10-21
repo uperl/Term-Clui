@@ -48,3 +48,4 @@
 20100515 1.55 narrow_the_clue only leaves mouse-mode if we're in mouse-mode
 20100516 1.56 ^C calls endwin and raises SIGINT
 20101017 1.60 Spoken interface; see CLUI_SPEAK, emacspeak, eflite
+20101021 1.61 bug fixed in ask() with a default

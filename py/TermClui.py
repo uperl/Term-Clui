@@ -47,17 +47,49 @@ a small and portable subset of vt100 sequences.  Also (since 1.50) the
 SET_ANY_EVENT_MOUSE and kmous (terminfo) sequences, which are supported
 by all xterm, rxvt, konsole, screen, linux, gnome and putty terminals.
 
+Since version 1.60, a speaking interface is provided for the visually
+impaired user.  It employs  eflite,  which is also used by  emacspeak.
+Speech is turned on either if the  EDITOR  environment variable is set
+to  emacspeak, or if the CLUI_SPEAK environment variable is set to
+any non-empty string.  Because TermClui's metaphor for the computer
+is a human-like conversation-partner, this works very naturally.
+The application needs no modification.
+
 Download TermClui.py from  www.pjb.com.au/midi/free/TermClui.py  or
-from http://cpansearch.perl.org/src/PJB/Term-Clui-1.57/py/TermClui.py
+from http://cpansearch.perl.org/src/PJB/Term-Clui-1.61/py/TermClui.py
 and put it in your PYTHONPATH.  TermClui.py depends on Python3.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.57
+Term::Clui and Term::Clui::FileSelect.  This is version 1.61
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.57'
+VERSION = '1.61'
+
+def _which(s):
+    for d in os.getenv('PATH').split(':'):
+        f = d+'/'+str(s)
+        if os.path.exists(f):
+            return f
+    return None
+def _warn(string):
+    print(string, file=sys.stderr)
+
+_Eflite = None
+_Eflite_FH = None  # open here at top-level so one sub can silence the previous
+if len(os.getenv('CLUI_SPEAK','')) > 0 or os.getenv('EDITOR','').find('emacspeak') == 0:
+    _Eflite = _which('eflite')
+    if _Eflite:
+        _pipe = subprocess.Popen(_Eflite, shell=False, stdin=subprocess.PIPE)
+        if _pipe:
+            _Eflite_FH = _pipe.stdin
+        else:
+            _warn("can't run _Eflite: $!\n")
+
+    else:
+        _warn("Term::Clui warning: CLUI_SPEAK set or EDITOR=emacspeak; but can't find eflite\n")
+
 
 # ------------------------ vt100 stuff -------------------------
 
@@ -491,7 +523,7 @@ def ask(question, default=''):
   try:
     r'''Prints the question and, on the same line, expects the user
 to input a string. Left- and Right-arrow and Backspace work
-as usual, ctrl-B goes to the beginning and ctrl-E to the end.
+as usual, ctrl-A goes to the beginning and ctrl-E to the end.
 If default is specified, it appears on the line initially.
 ask() returns the string when the user presses Enter.
 '''
@@ -499,12 +531,13 @@ ask() returns the string when the user presses Enter.
     if not question:
         return ''
     _initscr()
-    nol = _display_question(question);
+    nol = _display_question(question)
 
     i = 0    # cursor position
     n = 0    # string length
     s_a = []   # list of letters in string
     if default:
+        _speak(question+', default is '+default)
         default = re.sub('\t', '    ', default)
         s_a = [y for y in default]
         n = len(default)
@@ -513,6 +546,8 @@ ask() returns the string when the user presses Enter.
         #    _puts(s_a[j])
         _puts(default)
         #_left(n)
+    else:
+        _speak(question)
 
     while True:
         c = _getch()
@@ -556,14 +591,14 @@ ask() returns the string when the user presses Enter.
             n = 0
             _clrtoeol()
             s_a = []
-        elif c == "\002":
+        elif c == "\001":
             _left(i)
             i = 0
         elif c == "\005":
             _right(n-i)
             i = n
         elif c == "\014":
-            x = i  # do nothing
+            _speak("".join(s_a))
         elif str(type(c)) == "<class 'int'>":
             _beep()
         elif ord(c) >= 32:
@@ -572,7 +607,11 @@ ask() returns the string when the user presses Enter.
             s_a.insert(i, c)
             n+=1
             i+=1
-            _puts('x') if _silent else _puts(c)
+            if _silent:
+                _puts('x')
+            else:
+                _puts(c)
+                _speak(c)
             j = i
             while j < n:
                 _puts(s_a[j])
@@ -581,13 +620,15 @@ ask() returns the string when the user presses Enter.
             _left(n-i)
         else:
             _beep()
+    _speak("".join(s_a), True)
     _endwin()
     _silent = False
     return "".join(s_a)
-  except:
+  except Exception as err:
     # print("handling ask exception")
     _endwin()
     subprocess.call(['stty','sane'])
+    _warn(err)
     sys.exit()
 
 # ----------------------- choose stuff -------------------------
@@ -595,9 +636,6 @@ def _debug(string):
     tmp = open("/tmp/clui_debug", mode="a")
     print(string, file=tmp)
     tmp.close()
-
-def _warn(string):
-    print(string, file=sys.stderr)
 
 # my (%irow, %icol, $nrows, $clue_has_been_given, $choice, $this_cell);
 random.seed(None)
@@ -664,12 +702,19 @@ pressed is also selected), and choose() returns a list of strings.
             _puts(firstline + "(multiple)")
         else:
             _puts(firstline)
-
+        if _nrows >= _maxrows:
+            _speak(firstline+', ', wait=True)
+        else:
+            _speak(firstline+', multiple choice, '+_list[_this_cell])
     else:
         _puts(firstline)
+        if _nrows >= _maxrows:
+            _speak(firstline+', ', wait=True)
+        else:
+            _speak(firstline+', choose '+_list[_this_cell])
     _clrtoeol()
 
-    if (_nrows >= _maxrows):
+    if _nrows >= _maxrows:
         _list = _narrow_the_search(_list)
         if not _list:
             _up(1)
@@ -680,6 +725,7 @@ pressed is also selected), and choose() returns a list of strings.
                 return []
             else:
                 return None
+        _speak('choose '+_list[_this_cell])
     _wr_screen()
     print("\033[6n", end='', file=_ttyout)  # u7 will set _AbsCursX, _AbsCur
     _ttyout.flush()
@@ -701,6 +747,7 @@ pressed is also selected), and choose() returns a list of strings.
                     else:
                         return None
             _wr_screen()
+            _speak('choose '+_list[_this_cell])
         if (c == "q" or c == "\004"):
             _erase_lines(1)
             if _clue_has_been_given:
@@ -711,6 +758,7 @@ pressed is also selected), and choose() returns a list of strings.
                     _irow = 1
                     _list = _narrow_the_search(a_list)
                     _wr_screen()
+                    _speak('choose '+_list[_this_cell])
                     continue
                 else:
                     _up(1)
@@ -733,18 +781,22 @@ pressed is also selected), and choose() returns a list of strings.
             _this_cell+=1
             _wr_cell(_this_cell-1)
             _wr_cell(_this_cell)
+            _speak(_list[_this_cell])
         elif (((c == "l") or (c == _KEY_RIGHT)) and (_this_cell < (len(_list)-1)) and (_irow_a[_this_cell] == _irow_a[_this_cell+1])):
             _this_cell+=1
             _wr_cell(_this_cell-1)
             _wr_cell(_this_cell)
+            _speak(_list[_this_cell])
         elif (((c == "\010") or (c == _KEY_BTAB)) and (_this_cell > 0)):
             _this_cell-=1
             _wr_cell(_this_cell+1)
             _wr_cell(_this_cell)
+            _speak(_list[_this_cell])
         elif (((c == "h") or (c == _KEY_LEFT)) and (_this_cell > 0) and (_irow_a[_this_cell] == _irow_a[_this_cell-1])):
             _this_cell-=1
             _wr_cell(_this_cell+1)
             _wr_cell(_this_cell)
+            _speak(_list[_this_cell])
         elif (((c == "j") or (c == _KEY_DOWN)) and (_irow < _nrows)):
             mid_col = _icol_a[_this_cell] + int(0.5*len(_list[_this_cell]))
             left_of_target = 1000
@@ -767,6 +819,7 @@ pressed is also selected), and choose() returns a list of strings.
             _this_cell = inew
             _wr_cell(iold)
             _wr_cell(_this_cell)
+            _speak(_list[_this_cell])
         elif (((c == "k") or (c == _KEY_UP)) and (_irow > 1)):
             mid_col = _icol_a[_this_cell] + int(0.5*len(_list[_this_cell]))
             right_of_target = 1000
@@ -789,6 +842,7 @@ pressed is also selected), and choose() returns a list of strings.
             _this_cell = inew
             _wr_cell(iold)
             _wr_cell(_this_cell)
+            _speak(_list[_this_cell])
         elif c == "\014":
             if _size_changed:
                 _size_and_layout(_nrows)
@@ -839,8 +893,10 @@ pressed is also selected), and choose() returns a list of strings.
             set_default(firstline, _list[_this_cell]); # join ($,,@chosen) ?
             _clue_has_been_given = False
             if multichoice:
+                _speak(' and '.join(chosen), wait=True)
                 return chosen
             else:
+                _speak(_list[_this_cell], wait=True)
                 return _list[_this_cell]
         elif c == " ":
             if multichoice:
@@ -849,6 +905,7 @@ pressed is also selected), and choose() returns a list of strings.
                 #    _this_cell+=1
                 #    _wr_cell(_this_cell-1)
                 _wr_cell(_this_cell)
+                _speak('marked')
             #elif (_this_cell < (len(_list)-1)):
             #    _this_cell+=1
             #    _wr_cell(_this_cell-1)
@@ -1039,14 +1096,16 @@ def _ask_for_clue(nchoices, i, s):
             _goto(0,2)
             _puts("lengthen the clue : ")
             _right(i)
+            _speak("still "+str(nchoices)+" choices, lengthen the clue")
         else:
             headstr = "the choices won't fit; there are"
             _goto(0,1)
             _puts(headstr+" "+str(nchoices)+" of them")
             _clrtoeol()
             _goto(0,2)
-            _puts("   give me a clue :            (or ctrl-X to quit)")
+            _puts("   give me a clue :             (or ctrl-X to quit)")
             _left(30)
+            _speak(str(nchoices)+" choices, give me a clue, or control-X to quit")
     else:
         _goto(0,1)
         _puts("No choices fit this clue !")
@@ -1054,6 +1113,7 @@ def _ask_for_clue(nchoices, i, s):
         _goto(0,2)
         _puts(" shorten the clue : ")
         _right(i)
+        _speak("no choices fit, shorten the clue")
 
 def get_default(question):
     r'''Returns (what the dbm database remembers as) the choice the
@@ -1177,6 +1237,7 @@ def confirm(question):
     _initscr()
     nol = _display_question(question)
     _puts (" (y/n) ")
+    _speak(question + ', y or n')
     while (True):
         response=_getch()
         if (re.match('[yYnN]', response)):
@@ -1187,8 +1248,10 @@ def confirm(question):
     _clrtoeol()
     if (re.match('[yY]', response)):
         _puts("Yes")
+        _speak('yess', wait=True)
     else:
         _puts("No")
+        _speak('know', wait=True)
     _erase_lines(1)
     _endwin()
     if (re.match('[yY]', response)):
@@ -1445,6 +1508,7 @@ def sorry(msg):   # warns user of an error condition
     r'''Prints the message to stderr preceded by the word "Sorry, "
 '''
     print('Sorry, '+str(msg), file=sys.stderr)
+    _speak('Sorry, '+str(msg), wait=True)
 
 def inform(msg):
     r'''Prints the message to /dev/tty or to stderr.
@@ -1456,6 +1520,7 @@ def inform(msg):
         ttyout.close()
     except:
        print(str(msg), file=sys.stderr)
+    _speak(str(msg), wait=True)
 
 # ----------------------- view stuff -------------------------
 
@@ -1516,7 +1581,8 @@ def _tiview(title='', text=''):
     rows = _fmt(text, nofill=True);
     _initscr();
     if 3 > len(rows):
-        _puts("\r\n".join(rows) + "\r\n")
+        _puts(title+"\r\n"+("\r\n".join(rows))+"\r\n")
+        _speak(title+', '+(' '.join(rows)), wait=True)
         _endwin()
         return True
     if titlelength > (_maxcols-35):
@@ -1525,6 +1591,7 @@ def _tiview(title='', text=''):
         _puts (title+"   (<enter> to continue, q to clear)\r\n")
 
     _puts("\r" + "\r\n".join(rows) + "\r")  # the perl version does clrtoeol
+    _speak(title+', enter to continue,'+(' '.join(rows)))
     _icol = 0
     _irow = len(rows)
     _goto(titlelength+1, 0)
@@ -1562,13 +1629,31 @@ the keys and mouse actions the user has available when responding to
 a single-choice choose().
 '''
     if mode == 'ask':
-        return "\nLeft and Right arrowkeys, Backspace, Delete; ctrl-B = beginning; ctrl-E = end; ctrl-X = clear; then Return."
+        return "\nLeft and Right arrowkeys, Backspace, Delete; control-B = beginning; control-E = end; control-X = clear; then Return."
     text = "\nmove around with Mouse or Arrowkeys (or hjkl);"
     if re.match('mult',mode):
         text += " multiselect with Rightclick or Spacebar;"
     text += " then either q for quit, or choose with Leftclick or Return."
     return text
 # -------------------------- infrastructure -------------------------
+
+SpeakMode = set()
+def _speak(text, wait=None):   # 1.60
+    if not _Eflite_FH or not text or len(text) == 0:
+        return None
+    if len(text) == 1:
+        _Eflite_FH.write(bytes("s\nl {"+text+"}\n",'ISO-8859-1'))
+        _Eflite_FH.flush()
+        if wait:
+            time.sleep(0.5)
+    else:
+        if 'dot' in SpeakMode:
+            text = re.sub('\s*\.\s*', ' dot ', text)
+        _Eflite_FH.write(bytes("s\nq {"+text+"}\nd\n",'ISO-8859-1'))
+        _Eflite_FH.flush()
+        # useless emacspeak output: tts_sy nc_state all 0 0  1 225\nq {[:np  ]}
+        if wait:
+            time.sleep(0.3+0.07*len(text))
 
 _OpenFile = 0
 def _Open(filename, mode="r"):
@@ -1932,8 +2017,10 @@ Only directories will be displayed.  The default is False.
         if File:
              set_default(title, File)
  
+        SpeakMode.add('dot')
         if multichoice:
             new = choose(title, allfiles, multichoice=True)
+            SpeakMode.remove('dot')
             if not new:
                 return []
             for i in range(len(new)):
@@ -1941,6 +2028,7 @@ Only directories will be displayed.  The default is False.
             return new
 
         new = choose (title, allfiles)
+        SpeakMode.remove('dot')
 
         if (ShowAll and new == 'Hide DotFiles'):
             ShowAll = False

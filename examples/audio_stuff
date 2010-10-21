@@ -135,10 +135,10 @@ sub burn_wav {
 	my @files = select_file(-FPat=>'{*.wav,*.WAV}',-Path=>$ENV{PWD},-Chdir=>0);
 	return unless @files;
 	my $files = join "' '", @files;
-	speak("insert the C D into the drive, and press Return");
-	if ($eject) { system $eject; }
+	ask("insert the C D into the drive, and press Return");
+	# if ($eject) { system $eject; }
 	system "$cdrecord dev=0,0 -v -dao -pad -speed=12 -copy '$files'";
-	speak("finished burning the C D");
+	inform("finished burning the C D");
 	if ($eject) { system $eject; }
 }
 sub burn_files {
@@ -184,14 +184,12 @@ sub burn_files {
 	# could mount -o loop $tmpfile and check it's OK ...
 	if ($eject) { system $eject; }
 	while (1) {
-		speak("insert a blank C D into the drive, and press Return");
 		ask("insert blank CD into drive and press Return...");
 		# suppress line-feeds in the progress-bar (on stderr) ...
 		# should sleep, try, sleep, retry up to about 15 sec ...
 		system "$cdrecord dev=/dev/cdrom -v -dao $tmpfile";
 		if ($eject) { system $eject; }
-		speak("finished copying C D");
-		last unless confirm "do you want to write that to another CD ?";
+		last unless confirm("do you want to write that to another CD ?");
 	}
 	if (!unlink $tmpfile) { warn "can't unlink $tmpfile: $!\n"; }
 }
@@ -207,16 +205,14 @@ sub copy_cd {
 	my $olddir = 'pwd';
 	if (! chdir $tmpdir) { sorry("can't chdir $tmpdir: $!"); $ok=0; }
 	return unless $ok;
-	speak("insert the C D into the drive, and press Return");
+	ask("insert the C D into the drive, and press Return");
 	if ($eject) { system $eject; }
 	system "$cdda2wav dev=/dev/cdrom -vall cddb=0 -B -Owav";
 	if ($eject) { system $eject; }
 	while (1) {
-		speak("insert a blank C D into the drive, and press Return");
 		ask("insert blank CD into drive and press Return...");
 		system "$cdrecord dev=/dev/cdrom -v -dao -useinfo -text  *.wav";
 		if ($eject) { system $eject; }
-		speak("finished copying C D");
 		last unless confirm "do you want to write that to another CD ?";
 	}
 	chdir "$oldir";
@@ -234,7 +230,6 @@ sub copy_dvd {
 	if (! mkdir $tmp_mnt) { sorry("can't mkdir $tmp_mnt: $!"); $ok=0; }
 	return unless $ok;
 	if ($eject) { system $eject; }
-	speak("insert the DVD into the drive, and press Return");
 	ask("insert the DVD into drive, and press Return...");
 	# system "mount -t iso9660 -o ro,map=off /dev/cdrom $tmp_mnt";
 	# should sleep, try, sleep, retry up to about 15 sec ...
@@ -262,14 +257,12 @@ sub copy_dvd {
 	if (! rmdir $tmp_mnt) { warn "can't rmdir $tmp_mnt: $!\n"; }
 	# could mount -o loop $tmpfile and check it's OK ...
 	while (1) {
-		speak("insert a blank D V D into the drive, and press Return");
 		ask("insert blank DVD into drive and press Return...");
 		# suppress line-feeds in the progress-bar (on stderr) ...
 		# should sleep, try, sleep, retry up to about 15 sec ...
 		system "growisofs -dvd-compat -Z /dev/cdrom=$tmpfile"
 		 . "  2>&1 | perl -pe 's/\$/\\e[K\\e[A/'";
 		if ($eject) { system $eject; }
-		speak("finished copying D V D");
 		last unless confirm "do you want to write that to another DVD ?";
 	}
 	if (!unlink $tmpfile) { warn "can't unlink $tmpfile: $!\n"; }

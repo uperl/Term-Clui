@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.60';   # help_text(), Delete in ask(), various bugs
+$VERSION = '1.61';   # bug fixed in ask() with a default
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -368,7 +368,7 @@ sub ask { my ($question, $default) = @_;
 		$default =~ s/\t/	/g;
 		@s = split(q{}, $default); $n = scalar @s; $i = $[;
 		foreach $j ($[ .. $n) { &puts($s[$j]); }
-		# &left($n);
+		&left($n);
 	} else {
 		&speak($question);
 	}
@@ -1222,9 +1222,9 @@ The application needs no modification.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.60/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.61/py/TermClui.py
 
-This is Term::Clui.pm version 1.60
+This is Term::Clui.pm version 1.61
 
 =head1 WINDOW-SIZE
 
@@ -1498,6 +1498,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.60/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.61/py/TermClui.py
 
 =cut
