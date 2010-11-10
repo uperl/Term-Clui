@@ -49,3 +49,6 @@
 20100516 1.56 ^C calls endwin and raises SIGINT
 20101017 1.60 Spoken interface; see CLUI_SPEAK, emacspeak, eflite
 20101021 1.61 bug fixed in ask() with a default
+20101108 1.62 speech silences speakup if it's running
+20101109 1.62 speech uses espeak if eflite isn't there, ctrl-X quits choose()
+20101110 1.62 CLUI_MOUSE=OFF disables mouse-handling; bug fixed in ask_for_clue

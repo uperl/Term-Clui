@@ -48,24 +48,24 @@ SET_ANY_EVENT_MOUSE and kmous (terminfo) sequences, which are supported
 by all xterm, rxvt, konsole, screen, linux, gnome and putty terminals.
 
 Since version 1.60, a speaking interface is provided for the visually
-impaired user.  It employs  eflite,  which is also used by  emacspeak.
-Speech is turned on either if the  EDITOR  environment variable is set
-to  emacspeak, or if the CLUI_SPEAK environment variable is set to
-any non-empty string.  Because TermClui's metaphor for the computer
-is a human-like conversation-partner, this works very naturally.
-The application needs no modification.
+impaired user; it employs  eflite  or  espeak.  Speech is turned on
+if the CLUI_SPEAK environment variable is set to any non-empty string.
+Since version 1.62, if  speakup  is running, it is silenced while
+TermClui runs, and then restored.  Because TermClui's metaphor for
+the computer is a human-like conversation-partner, this works very
+naturally.  The application needs no modification.
 
 Download TermClui.py from  www.pjb.com.au/midi/free/TermClui.py  or
-from http://cpansearch.perl.org/src/PJB/Term-Clui-1.61/py/TermClui.py
+from http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
 and put it in your PYTHONPATH.  TermClui.py depends on Python3.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.61
+Term::Clui and Term::Clui::FileSelect.  This is version 1.62
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.61'
+VERSION = '1.62'
 
 def _which(s):
     for d in os.getenv('PATH').split(':'):
@@ -76,19 +76,51 @@ def _which(s):
 def _warn(string):
     print(string, file=sys.stderr)
 
+def _is_writeable(arg):
+    my_type = str(type(arg))
+    if my_type == "<class 'str'>":
+        if not os.path.exists(arg):
+            return False
+        my_stat_result = os.stat(arg)
+    elif my_type == "<class 'posix.stat_result'>":
+        my_stat_result = arg
+    else:
+        return False
+    my_euid = os.geteuid()
+    my_groups = os.getgroups()
+    my_fuid = my_stat_result.st_uid
+    my_fgid = my_stat_result.st_gid
+    my_mode = my_stat_result.st_mode
+    if (my_euid == my_fuid) and (my_mode & 0o200):
+        return True
+    if my_mode & 0o20:
+        for gid in my_groups:
+            if gid == my_fgid:
+                return True
+    if my_mode & 0o2:
+        return True
+    return False
+
 _Eflite = None
-_Eflite_FH = None  # open here at top-level so one sub can silence the previous
-if len(os.getenv('CLUI_SPEAK','')) > 0 or os.getenv('EDITOR','').find('emacspeak') == 0:
+_Eflite_FH = None # open here at top-level so one sub can silence the previous
+_Espeak = None
+_Espeak_PID = 0  # defined at top-level so one espeak can kill the previous
+_SpeakUpSilentFile = None   # 1.62
+if len(os.getenv('CLUI_SPEAK','')) > 0:
+    for d in ['/sys/accessibility', '/proc']:
+        if _is_writeable(d+"/speakup/silent"):
+            _SpeakUpSilentFile = d+"/speakup/silent"
+            break
     _Eflite = _which('eflite')
+    _Espeak = _which('espeak')
     if _Eflite:
         _pipe = subprocess.Popen(_Eflite, shell=False, stdin=subprocess.PIPE)
         if _pipe:
             _Eflite_FH = _pipe.stdin
         else:
-            _warn("can't run _Eflite: $!\n")
-
-    else:
-        _warn("Term::Clui warning: CLUI_SPEAK set or EDITOR=emacspeak; but can't find eflite\n")
+            _warn("can't run "+str(_Eflite)+": $!\n")
+    elif not _Espeak:
+        _warn("TermClui warning: CLUI_SPEAK set; but can't find eflite or espeak")
 
 
 # ------------------------ vt100 stuff -------------------------
@@ -353,11 +385,16 @@ _InitscrAlreadyRun = 0   # its a counter
 # tty = True
 _ttyout_fnum = 0
 _old_tcattr = 0
-_IsMouseMode = False;
-_WasMouseMode = False;
+_IsMouseMode = False
+_WasMouseMode = False
+_IsSpeakUpSilent  = False  # 1.62
+_WasSpeakUpSilent = False  # 1.62
 
-def _enter_mouse_mode ():   # 1.50  # do we need this in Python?
+
+def _enter_mouse_mode ():   # 1.50
     global _ttyin, _IsMouseMode
+    if os.getenv('CLUI_MOUSE') == 'OFF':
+        return ''
     if _IsMouseMode:
         _warn("_enter_mouse_mode but already IsMouseMode\r\n")
         return 1
@@ -368,8 +405,10 @@ def _enter_mouse_mode ():   # 1.50  # do we need this in Python?
     _IsMouseMode = True
     return 1
 
-def _leave_mouse_mode ():   # 1.50  # do we need this in Python?
+def _leave_mouse_mode ():   # 1.50
     global _ttyin, _IsMouseMode
+    if os.getenv('CLUI_MOUSE') == 'OFF':
+        return ''
     if not _IsMouseMode:
         _warn("_leave_mouse_mode but not IsMouseMode\r\n")
         return 1
@@ -380,9 +419,38 @@ def _leave_mouse_mode ():   # 1.50  # do we need this in Python?
     _IsMouseMode = False
     return 1
 
-def _initscr(mouse_mode=False):  # needed for 1.50
+def _enter_speakup_silent ():   # 1.62
+    global _ttyin, _IsSpeakUpSilent, _SpeakUpSilentFile
+    if not _SpeakUpSilentFile:
+        return False
+    if _IsSpeakUpSilent:
+        _warn("_enter_speakup_silent but already IsSpeakUpSilent\r\n")
+        return True
+    S = open(_SpeakUpSilentFile, 'w')
+    S.write("7\n")
+    # S.close()
+    _IsSpeakUpSilent = True
+    return True
+
+def _leave_speakup_silent ():   # 1.62
+    global _ttyin, _IsSpeakUpSilent, _SpeakUpSilentFile
+    if not _SpeakUpSilentFile:
+        return False
+    if not _IsSpeakUpSilent:
+        _warn("_leave_speakup_silent but not IsSpeakUpSilent\r\n")
+        return True
+    S = open(_SpeakUpSilentFile, 'w')
+    S.write("4\n")
+    # S.close()
+    _IsSpeakUpSilent = False
+    return True
+
+def _initscr(mouse_mode=False, speakup_silent=False):
     global _ttyout_fnum, _old_tcattr, _getchar, _ttyin, _ttyout
-    global _InitscrAlreadyRun, _icol,_irow, _IsMouseMode, _WasMouseMode
+    global _InitscrAlreadyRun, _icol,_irow
+    global _IsMouseMode, _WasMouseMode, _IsSpeakUpSilent, _WasSpeakUpSilent
+    if os.getenv('CLUI_MOUSE') == 'OFF':
+        mouse_mode = False
     _icol = 0
     _irow = 0
     if _InitscrAlreadyRun > 0:
@@ -394,6 +462,13 @@ def _initscr(mouse_mode=False):  # needed for 1.50
             if not _enter_mouse_mode():
                 return False 
         _WasMouseMode = _IsMouseMode
+        if not speakup_silent and _IsSpeakUpSilent:
+            if not _leave_speakup_silent():
+                return False 
+        elif speakup_silent and not _IsSpeakUpSilent:
+            if not _enter_speakup_silent():
+                return False 
+        _WasSpeakUpSilent = _IsSpeakUpSilent
         _icol = 0
         _irow = 0
         return
@@ -406,7 +481,6 @@ def _initscr(mouse_mode=False):  # needed for 1.50
     signal.signal(3, _cleanup)
     signal.signal(15, _cleanup)
     if mouse_mode:
-        #_ttyin  = open("/dev/tty", mode="rb", buffering=0)
         _ttyin  = open("/dev/tty", mode="r")
         _IsMouseMode = True
         # encoding_string = ':bytes';
@@ -414,7 +488,8 @@ def _initscr(mouse_mode=False):  # needed for 1.50
     else:
         _ttyin  = open("/dev/tty", mode="r")
         _IsMouseMode = False
-
+    if speakup_silent and not _IsSpeakUpSilent:
+        _enter_speakup_silent()
     try:
         import tty
         _ttyout_fnum = _ttyout.fileno()
@@ -450,24 +525,24 @@ def _cleanup(num,frame):
 
 def _endwin():
     global _ttyout, _old_tcattr, _InitscrAlreadyRun
-    global _IsMouseMode, _WasMouseMode
+    global _IsMouseMode, _WasMouseMode, _IsSpeakUpSilent, _WasSpeakUpSilent
     print("\033[0m", end='', file=_ttyout)
     if _InitscrAlreadyRun > 1:
         if _IsMouseMode and not _WasMouseMode:
             _leave_mouse_mode()
         elif not _IsMouseMode and _WasMouseMode:
             _enter_mouse_mode()
-        _InitscrAlreadyRun-=1
+        if _IsSpeakUpSilent and not _WasSpeakUpSilent:
+            _leave_speakup_silent()
+        elif not _IsSpeakUpSilent and _WasSpeakUpSilent:
+            _enter_speakup_silent()
+        _InitscrAlreadyRun -= 1
         return
     print("\033[?1003l", end='', file=_ttyout)
     _ttyout.flush()
-    if _InitscrAlreadyRun > 1:
-        if _IsMouseMode and not _WasMouseMode:
-            _leave_mouse_mode()
-        elif not _IsMouseMode and _WasMouseMode:
-            _enter_mouse_mode()
-        _InitscrAlreadyRun-=1
-        return
+    __IsMouseMode = False
+    if _IsSpeakUpSilent:
+        _leave_speakup_silent()
     import tty
     _ttyout_fnum = _ttyout.fileno()
     tty.setcbreak(_ttyout_fnum)
@@ -530,7 +605,7 @@ ask() returns the string when the user presses Enter.
     global _silent, _KEY_LEFT, _KEY_RIGHT
     if not question:
         return ''
-    _initscr()
+    _initscr(speakup_silent=True)
     nol = _display_question(question)
 
     i = 0    # cursor position
@@ -541,11 +616,11 @@ ask() returns the string when the user presses Enter.
         default = re.sub('\t', '    ', default)
         s_a = [y for y in default]
         n = len(default)
-        i = n
+        #i = n
         #for j in range(len(s_a)):
         #    _puts(s_a[j])
         _puts(default)
-        #_left(n)
+        _left(n)
     else:
         _speak(question)
 
@@ -654,11 +729,16 @@ with one (the cursor) highlit. Initially, the cursor is on that string
 which the user chose previously in response to this same question.
 The user then uses arrow keys (or hjkl) and Return, or q to quit.
 The Return key causes choose() to return the string under the cursor;
-q for Quit causes choose() to return None.
+q or ctrl-X for Quit causes choose() to return None.
 
 If there are too many choices to fit on the screen, the user is
 prompted for a (case-sensitive) clue, which is used to narrow down
 the choices until they do fit.
+
+If the environment variable CLUI_MOUSE is set to OFF
+then choose() will not interpret mouse-clicks as making a choice.
+The advantage of this is that the mouse can then be used
+to highlight and paste text from this window as usual.``
 
 If multichoice is set, the SpaceBar works to select (or deselect)
 the various choices (the choice under the cursor when Return is
@@ -684,7 +764,7 @@ pressed is also selected), and choose() returns a list of strings.
     firstlinelength = len(firstline)
     _choice = get_default(firstline)
     chosen = []
-    _initscr(mouse_mode=True)
+    _initscr(mouse_mode=True, speakup_silent=True)
     _size_and_layout(0)
     if (len(lines) > 1):
        _otherlines = lines[1]
@@ -748,7 +828,7 @@ pressed is also selected), and choose() returns a list of strings.
                         return None
             _wr_screen()
             _speak('choose '+_list[_this_cell])
-        if (c == "q" or c == "\004"):
+        if (c == "q" or c == "\004" or c == "\030"):
             _erase_lines(1)
             if _clue_has_been_given:
                 re_clue = confirm("Do you want to change your clue ?")
@@ -1104,7 +1184,7 @@ def _ask_for_clue(nchoices, i, s):
             _clrtoeol()
             _goto(0,2)
             _puts("   give me a clue :             (or ctrl-X to quit)")
-            _left(30)
+            _left(31)
             _speak(str(nchoices)+" choices, give me a clue, or control-X to quit")
     else:
         _goto(0,1)
@@ -1234,7 +1314,7 @@ def confirm(question):
     # return(0) unless -t STDERR
     if not os.isatty(sys.stdout.fileno()):
         return(None)
-    _initscr()
+    _initscr(speakup_silent=True)
     nol = _display_question(question)
     _puts (" (y/n) ")
     _speak(question + ', y or n')
@@ -1382,30 +1462,6 @@ def _re_grep(regexp, a_list):
             l.append(tmpstr)
     return l
 
-def _is_writeable(arg):
-    my_type = str(type(arg))
-    if my_type == "<class 'str'>":
-        if not os.path.exists(arg):
-            return False
-        my_stat_result = os.stat(arg)
-    elif my_type == "<class 'posix.stat_result'>":
-        my_stat_result = arg
-    else:
-        return False
-    my_euid = os.geteuid()
-    my_groups = os.getgroups()
-    my_fuid = my_stat_result.st_uid
-    my_fgid = my_stat_result.st_gid
-    my_mode = my_stat_result.st_mode
-    if (my_euid == my_fuid) and (my_mode & 0o200):
-        return True
-    if my_mode & 0o20:
-        for gid in my_groups:
-            if gid == my_fgid:
-                return True
-    if my_mode & 0o2:
-        return True
-    return False
 
 def _is_readable(arg):
     my_type = str(type(arg))
@@ -1630,30 +1686,72 @@ a single-choice choose().
 '''
     if mode == 'ask':
         return "\nLeft and Right arrowkeys, Backspace, Delete; control-B = beginning; control-E = end; control-X = clear; then Return."
-    text = "\nmove around with Mouse or Arrowkeys (or hjkl);"
+    if os.getenv('CLUI_MOUSE') == 'OFF':
+        text = "\nmove around with Arrowkeys (or hjkl);"
+    else:
+        text = "\nmove around with Mouse or Arrowkeys (or hjkl);"
     if re.match('mult',mode):
         text += " multiselect with Rightclick or Spacebar;"
-    text += " then either q for quit, or choose with Leftclick or Return."
+    text += " then either q or ctrl-X for quit,"
+    if os.getenv('CLUI_MOUSE') == 'OFF':
+        text += " or Return to choose."
+    else:
+        text += " or choose with Leftclick or Return."
     return text
 # -------------------------- infrastructure -------------------------
 
 SpeakMode = set()
 def _speak(text, wait=None):   # 1.60
-    if not _Eflite_FH or not text or len(text) == 0:
+    global _Eflite_FH, _Espeak, _Espeak_PID
+    if (not _Eflite_FH and not _Espeak) or not text or len(text) == 0:
         return None
-    if len(text) == 1:
-        _Eflite_FH.write(bytes("s\nl {"+text+"}\n",'ISO-8859-1'))
-        _Eflite_FH.flush()
-        if wait:
-            time.sleep(0.5)
-    else:
-        if 'dot' in SpeakMode:
-            text = re.sub('\s*\.\s*', ' dot ', text)
-        _Eflite_FH.write(bytes("s\nq {"+text+"}\nd\n",'ISO-8859-1'))
-        _Eflite_FH.flush()
-        # useless emacspeak output: tts_sy nc_state all 0 0  1 225\nq {[:np  ]}
-        if wait:
-            time.sleep(0.3+0.07*len(text))
+    if 'dot' in SpeakMode:
+        text = re.sub('\s*\.\s*', ' dot ', text)
+        text = re.sub(r'\s*\.(\w)', r' dot \1', text)
+    if _Eflite_FH:
+        if len(text) == 1:
+            if text == '.':
+            	_Eflite_FH.write(bytes("s\nq { dot }\nd\n",'ISO-8859-1'))
+            else:
+            	_Eflite_FH.write(bytes("s\nl {"+text+"}\n",'ISO-8859-1'))
+            _Eflite_FH.flush()
+            if wait:
+                time.sleep(0.5)
+        else:
+            _Eflite_FH.write(bytes("s\nq {"+text+"}\nd\n",'ISO-8859-1'))
+            _Eflite_FH.flush()
+            # useless emacspeak op: tts_sy nc_state all 0 0  1 225\nq {[:np  ]}
+            if wait:
+                time.sleep(0.3+0.07*len(text))
+    elif _Espeak:
+        if _Espeak_PID > 0.5:
+            os.kill(_Espeak_PID, signal.SIGHUP)
+            os.wait()
+            _Espeak_PID = None;
+        _Espeak_PID = os.fork()
+        if _Espeak_PID > 0.5:
+            if wait:
+                if len(text) == 1:
+                    time.sleep(0.6)
+                else:
+                    time.sleep(0.4+0.07*len(text))
+        else:
+            pipe = subprocess.Popen(_Espeak, stdin=subprocess.PIPE)
+            if not pipe:
+                sys.exit()
+            def _huphandler(signum,stackframe):
+                pipe.kill()
+                os.wait()
+                sys.exit()
+            signal.signal(signal.SIGHUP, _huphandler)
+            if text == '.':
+                text = 'dot'
+            pipe.stdin.write(text.encode('utf8')+b"\n")
+            pipe.stdin.flush()
+            pipe.stdin.close()
+            os.wait()
+            sys.exit()
+
 
 _OpenFile = 0
 def _Open(filename, mode="r"):

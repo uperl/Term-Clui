@@ -10,7 +10,6 @@ Its metaphor for the computer is a human-like conversation-partner,
 and as each answer/response is completed it is summarised onto one line,
 and remains on screen, so that the history of the dialogue gradually
 accumulates on the screen and is available for review, or for cut/paste.
-If &choose is called in an array context, it offers multiple choice.
 Also included is the file-selector module Term::Clui::FileSelect,
 with its main subroutine &select_file.  Term::Clui doesn't yet work
 under Windows.
@@ -34,12 +33,14 @@ and ctrl-D or ctrl-X clear the current string.
 response to the same question, and if it's still in the list this
 time then &choose highlights it as the default. Thus &choose manages
 its own defaults, and menus using Term::Clui autoconfigure themselves
-to the user's preferences.
+to the user's preferences.  When &choose is called in an array context,
+it offers the user a multiple choice;  mouse-button3 or the Spacebar
+mark items in a multiple choice.  If the choices won't fit on the
+screen the user is asked for a substring clue.
 
 The programmer can pass &ask a default string, as an optional second
-argument.  When &choose is called in an array context, it offers the
-user a multiple choice.   &select_file  obeys options modelled after
-those of Tk::FileDialog.pm and Tk::SimpleFileSelect.pm
+argument.  &select_file  obeys options modelled after those of
+Tk::FileDialog.pm and Tk::SimpleFileSelect.pm
 
 Term::Clui is fast,  very easy for both programmer and user, and has
 few external dependencies. It doesn't use curses which is a whole-of
@@ -50,19 +51,18 @@ if not, it tries `tput`.
 
 For the user, Version 1.50 introduced a significant upgrade: mouse-
 -handling. The user can now select an item in &choose using the mouse
-and left-click, as well as by using the arrowkeys and return as before.
-&choose uses the mouse or arrow keys or hjkl, and return or button1,
-(or q to quit);  button3 or the spacebar mark items in a multiple
-choice. If the choices won't fit on the screen the user is asked for
-a substring clue.
+and left-click, as well as by using the arrowkeys and return as before
+(or q or ctrl-X to quit);  button3 or the spacebar mark items in a
+multiple choice.  Since version 1.62, mouse-handling can be disabled
+by setting CLUI_MOUSE=OFF; by default, it is on.
 
 Since version 1.60, a speaking interface is provided for the visually
-impaired user.  It employs  eflite,  which is also used by  emacspeak.
-Speech is turned on either if the  EDITOR  environment variable is set
-to  emacspeak, or if the CLUI_SPEAK environment variable is set to
-any non-empty string.  Because TermClui's metaphor for the computer
-is a human-like conversation-partner, this works very naturally.
-The application needs no modification.
+impaired user.  It employs  either eflite or espeak. Speech is turned
+on if the CLUI_SPEAK environment variable is set to a non-empty string;
+by default, it is off.  If speakup is running,  then it is silenced
+while Term::Clui runs, and then restored.  Because Term::Clui's
+metaphor for the computer is a human-like conversation-partner, this
+works very naturally, and the application needs no modification.
 
 A calling-interface-compatible Python3-module is included.
 

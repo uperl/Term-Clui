@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.61';   # bug fixed in ask() with a default
+$VERSION = '1.62';   # handles speakup, can use espeak, introduces CLUI_MOUSE
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -30,20 +30,29 @@ if ($@) {
 
 my $Eflite;
 my $Eflite_FH;  # open here at top-level so one sub can silence the previous
-if ($ENV{'CLUI_SPEAK'} or $ENV{'EDITOR'} =~ /^emacspeak/) {
+my $Espeak;
+my $Espeak_PID;  # defined at top-level so one espeak can kill the previous
+my $SpeakUpSilentFile;   # 1.62
+if ($ENV{'CLUI_SPEAK'}) {  # 1.62 emacspeak not very relevant as a criterion
+	for my $d ('/sys/accessibility', '/proc') {
+		if (-w "$d/speakup/silent") {
+			$SpeakUpSilentFile = "$d/speakup/silent"; break;
+		}
+	}
 	$Eflite = &which('eflite');
+	$Espeak = &which('espeak');
 	if ($Eflite) {
 		if (open($Eflite_FH,'|-',$Eflite)) {
 			select((select($Eflite_FH), $| = 1)[$[]); print $Eflite_FH q{};
-			eval 'sub END { close $Eflite_FH; }';
 		} else {
 			warn "can't run $Eflite: $!\n";
 		}
-	} else {
-		warn("Term::Clui warning: CLUI_SPEAK set"
-		. " or EDITOR=emacspeak; but can't find eflite\n");
+	} elsif (! $Espeak) {
+		warn("Term::Clui warning: CLUI_SPEAK set; "
+		. "but can't find eflite or espeak\n");
 	}
 }
+
 
 # use open ':locale';  # the open pragma was introduced in 5.8.6
 my $EncodingString = q{};
@@ -234,11 +243,14 @@ sub goto { my $newcol = shift; my $newrow = shift;
 # sub move { my ($ix,$iy) = @_; printf TTY "\e[%d;%dH",$iy+1,$ix+1; }
 
 my $InitscrAlreadyRun = 0;
-my $IsMouseMode = 0;
+my $IsMouseMode  = 0;
 my $WasMouseMode = 0;
+my $IsSpeakUpSilent  = 0;  # 1.62
+my $WasSpeakUpSilent = 0;  # 1.62
 my $Stty = q{};
 
 sub enter_mouse_mode {   # 1.50
+	if ($ENV{'CLUI_MOUSE'} eq 'OFF') { return 0; }   # 1.62
 	if ($IsMouseMode) {
 		warn "enter_mouse_mode but already IsMouseMode\r\n"; return 1 ;
 	}
@@ -252,6 +264,7 @@ sub enter_mouse_mode {   # 1.50
 	return 1;
 }
 sub leave_mouse_mode {   # 1.50
+	# if ($ENV{'CLUI_MOUSE'} =~ /off/i) { return 0; }   # 1.62
 	if (!$IsMouseMode) {
 		warn "leave_mouse_mode but not IsMouseMode\r\n"; return 1 ;
 	}
@@ -265,7 +278,31 @@ sub leave_mouse_mode {   # 1.50
 	return 1;
 }
 
-sub initscr {  my $mouse_mode = $_[$[];  # needed for mouse-handling
+sub enter_speakup_silent {   # 1.62
+	# echo 7 > /sys/accessibility/speakup/silent  if it exists
+	if (!$SpeakUpSilentFile) { return 0; }
+	if ($IsSpeakUpSilent) {
+		warn "enter_speakup_silent but already IsSpeakUpSilent\r\n"; return 1 ;
+	}
+	if (open(S, '>', $SpeakUpSilentFile)) { print S "7\n"; close S; }
+	$IsSpeakUpSilent = 1;
+	return 1;
+}
+sub leave_speakup_silent {   # 1.62
+	# echo 4 > /sys/accessibility/speakup/silent  if it exists
+	if (!$SpeakUpSilentFile) { return 0; }
+	if (!$IsSpeakUpSilent) {
+		warn "leave_speakup_silent but not IsSpeakUpSilent\r\n"; return 1 ;
+	}
+	if (open(S, '>', $SpeakUpSilentFile)) { print S "4\n"; close S; }
+	$IsSpeakUpSilent = 0;
+	return 1;
+}
+
+sub initscr { my %args = @_;
+	my $mouse_mode = $args{'mouse_mode'};          # for mouse-handling
+	if ($ENV{'CLUI_MOUSE'} eq 'OFF') { $mouse_mode = undef; }  # 1.62
+	my $speakup_silent = $args{'speakup_silent'};  # to silence SpeakUp
 	if ($InitscrAlreadyRun) {
 		$InitscrAlreadyRun++;
 		if (!$mouse_mode and $IsMouseMode) {
@@ -274,6 +311,12 @@ sub initscr {  my $mouse_mode = $_[$[];  # needed for mouse-handling
 			enter_mouse_mode() or return 0;
 		}
 		$WasMouseMode = $IsMouseMode;
+		if (!$speakup_silent and $IsSpeakUpSilent) {   # 1.62
+			leave_speakup_silent() or return 0;
+		} elsif ($speakup_silent and !$IsSpeakUpSilent) {
+			enter_speakup_silent() or return 0;
+		}
+		$WasSpeakUpSilent = $IsSpeakUpSilent;
 		$icol = 0; $irow = 0;
 		return;
 	}
@@ -287,6 +330,7 @@ sub initscr {  my $mouse_mode = $_[$[];  # needed for mouse-handling
 	} else {
 		$IsMouseMode = 0; $encoding_string = $EncodingString;
 	}
+	if ($speakup_silent and !$IsSpeakUpSilent) { enter_speakup_silent(); }
 	open(TTYIN, "<$encoding_string", '/dev/tty')
 	 || (warn "Can't read /dev/tty: $!\n", return 0);
 
@@ -297,20 +341,26 @@ sub initscr {  my $mouse_mode = $_[$[];  # needed for mouse-handling
 		} else { system("stty -echo -icrnl raw </dev/tty >/dev/tty");
 		}
 	}
-
 	select((select(TTY), $| = 1)[$[]); print TTY q{};
 	$rin = q{}; vec($rin, fileno(TTYIN), 1) = 1;
 	$icol = 0; $irow = 0; $InitscrAlreadyRun = 1;
 }
+
 sub endwin {
 	print TTY "\e[0m";
 	if ($InitscrAlreadyRun > 1) {
 		if      ($IsMouseMode and !$WasMouseMode) { leave_mouse_mode();
 		} elsif (!$IsMouseMode and $WasMouseMode) { enter_mouse_mode();
 		}
+		if      ($IsSpeakUpSilent and !$WasSpeakUpSilent) {   # 1.62
+			leave_speakup_silent();
+		} elsif (!$IsSpeakUpSilent and $WasSpeakUpSilent) {
+			enter_speakup_silent();
+		}
 		$InitscrAlreadyRun--; return;
 	}
 	print TTY "\e[?1003l";   $IsMouseMode = 0;
+	if ($IsSpeakUpSilent) { leave_speakup_silent(); }
 	if ($have_Term_ReadKey) {
 		Term::ReadKey::ReadMode('restore', *TTYIN);
 		close TTY; close TTYIN;
@@ -360,7 +410,8 @@ sub ask_password { # no echo - use for passwords
 }
 sub ask { my ($question, $default) = @_;
 	return q{} unless $question;
-	&initscr(); my $nol = &display_question($question);
+	&initscr(speakup_silent=>1);
+	my $nol = &display_question($question);
 
 	my $i = 0; my $n = 0; my @s = (); # cursor position, length, string
 	if ($default) {
@@ -414,7 +465,7 @@ sub ask { my ($question, $default) = @_;
 		} else { &beep();
 		}
 	}
-	if ($Eflite_FH) { &speak(join("", @s), 'wait'); }
+	&speak(join("", @s), 'wait');
 	&endwin(); $silent = q{}; return join("", @s);
 }
 
@@ -446,10 +497,11 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 	$choice = &get_default($firstline);
 	# If wantarray ? Is remembering multiple choices safe ?
 
-	&initscr('mouse_mode');
+	&initscr(mouse_mode=>1, speakup_silent=>1);
 	&size_and_layout(0);
 	@otherlines = &fmt($otherlines);
 	$notherlines = scalar @otherlines;
+	my $speaktext = join(' ',$list[$this_cell],'. ',@otherlines);
 	if (wantarray) {
 		$#marked = $#list;
 		if ($firstlinelength < $maxcols-30) {
@@ -462,12 +514,12 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 			&puts("$firstline\n\r");
 		}
 		if ($nrows >= $maxrows) { &speak("$firstline, ", 'wait');
-		} else { &speak("$firstline, multiple choice, $list[$this_cell]");
+		} else { &speak("$firstline, multiple choice, $speaktext");
 		}
 	} else {
 		&puts("$firstline\n\r");
 		if ($nrows >= $maxrows) { &speak("$firstline, ", 'wait');
-		} else { &speak("$firstline, choose, $list[$this_cell]");
+		} else { &speak("$firstline, choose, $speaktext");
 		}
 	}
 	if ($nrows >= $maxrows) {
@@ -476,7 +528,8 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 			&up(1); &clrtoeol(); &endwin(); $clue_has_been_given = 0;
 			return wantarray ? () : undef;
 		}
-		&speak("choose, $list[$this_cell]");
+		my $speaktext = join(' ',$list[$this_cell],'. ',@otherlines);
+		&speak("choose, $speaktext");
 	}
 	&wr_screen();
 	# the cursor is now on this_cell, not on the question
@@ -497,7 +550,7 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 			&wr_screen();
 			&speak("choose, $list[$this_cell]");
 		}
-		if ($c eq "q" || $c eq "\cD") {
+		if ($c eq "q" || $c eq "\cD" || $c eq "\cX") {
 			&erase_lines(1);
 			if ($clue_has_been_given) {
 				my $re_clue = &confirm("Do you want to change your clue ?");
@@ -742,7 +795,7 @@ sub ask_for_clue { my ($nchoices, $i, $s) = @_;
 			&goto(0,1); &puts("$headstr $nchoices of them"); &clrtoeol();
 			&goto(0,2);
 			&puts("   give me a clue :             (or ctrl-X to quit)");
-			&left(30);
+			&left(31);   # 1.62
 			&speak("$nchoices choices, give me a clue, or control-X to quit");
 		}
 	} else {
@@ -752,7 +805,7 @@ sub ask_for_clue { my ($nchoices, $i, $s) = @_;
 	}
 }
 sub get_default { my ($question) = @_;
-	if ($ENV{CLUI_DIR} eq 'OFF') { return undef; }
+	if ($ENV{CLUI_DIR} =~ /off/i) { return undef; }
 	if (! $question) { return undef; }
 	my @choices;
 	my $n_tries = 5;
@@ -772,7 +825,7 @@ sub get_default { my ($question) = @_;
 	}
 }
 sub set_default { my $question = shift; my $s = join($; , @_);
-	if ($ENV{CLUI_DIR} eq 'OFF') { return undef; }
+	if ($ENV{CLUI_DIR} =~ /off/i) { return undef; }
 	if (! $question) { return undef; }
 	my $n_tries = 5;
 	while ($n_tries--) {
@@ -789,7 +842,7 @@ sub set_default { my $question = shift; my $s = join($; , @_);
 	return $s;
 }
 sub dbm_file {
-	if ($ENV{CLUI_DIR} eq 'OFF') { return undef; }
+	if ($ENV{CLUI_DIR} =~ /off/i) { return undef; }
 	my $db_dir;
 	if ($ENV{CLUI_DIR}) {
 		$db_dir = $ENV{CLUI_DIR};
@@ -841,18 +894,27 @@ sub help_text { # 1.54
 		return "\nLeft and Right arrowkeys, Backspace, Delete; control-A = "
 		 . " beginning; control-E = end; control-X = clear; then Return.";
 	}
-	$text = "\nmove around with Mouse or Arrowkeys (or hjkl);";
+	if ($ENV{'CLUI_MOUSE'} eq 'OFF') {
+		$text = "\nmove around with Arrowkeys (or hjkl);";
+	} else {
+		$text = "\nmove around with Mouse or Arrowkeys (or hjkl);";
+	}
 	if ($_[$[] =~ /^mult/) {
 		$text .= " multiselect with Rightclick or Spacebar;";
 	}
-	$text .= " then either q for quit, or choose with Leftclick or Return.";
+	$text .= " then either q or ctrl-X for quit,";
+	if ($ENV{'CLUI_MOUSE'} eq 'OFF') {
+		$text .= " or Return to choose.";
+	} else {
+		$text .= " or choose with Leftclick or Return.";
+	}
 }
 
 # ----------------------- confirm stuff -------------------------
 
 sub confirm { my $question = shift;  # asks user Yes|No, returns 1|0
 	return(0) unless $question;  return(0) unless -t STDERR;
-	&initscr();
+	&initscr(speakup_silent=>1);
 	my $nol = &display_question($question); &puts(" (y/n) ");
 	&speak($question . ', y or n');
 	while (1) {
@@ -867,10 +929,10 @@ sub confirm { my $question = shift;  # asks user Yes|No, returns 1|0
 	&left(6); &clrtoeol(); 
 	if ($response=~/^[yY]/) {
 		&puts("Yes");
-		if ($Eflite_FH) { &speak('yess', 'wait'); }
+		&speak('yess', 'wait');
 	} else {
 		&puts("No");
-		if ($Eflite_FH) { &speak('know', 'wait'); }
+		&speak('know', 'wait');
 	}
 	&erase_lines(1); &endwin();
 	if ($response =~ /^[yY]/) { return 1; } else { return 0 ; }
@@ -1055,24 +1117,58 @@ sub which {
 	foreach $d (split(":",$ENV{'PATH'})) {$f="$d/$_[$[]"; return $f if -x $f;}
 }
 %SpeakMode = ();
+sub END {
+	if ($Eflite_FH) { print $Eflite_FH "s\nq { }\n"; close $Eflite_FH;
+	} elsif ($Espeak_PID) { kill SIGHUP, $Espeak_PID; wait;
+	}
+}
 sub speak {  my ($text, $wait) = @_;
-	return unless $Eflite_FH;
 	$text="$text";
-	return unless length($text);
-	# if ($Flite_PID) { kill 'TERM', $Flite_PID; }  $Flite_PID = fork();
-	# if ($Flite_PID == 0) { exec $Flite, '-voice', 'rms', '-t', $text; }
-	# system("$Flite -voice rms -t '$text' &"); }
-	if (length($text) == 1) {
-		print $Eflite_FH "s\nl {$text}\n";
-		if ($wait) { select(undef,undef,undef,0.5); }
-	} else {
-		# could replace the punctuation chars with their descriptive words...
-		if ($SpeakMode{'dot'}) {
-			$text =~ s/\s*\.\s*/ dot /g;
+	return unless length($text);  # should clean up for exit: kill or wait
+	# could replace the punctuation chars with descriptive words...
+	if ($SpeakMode{'dot'}) {
+		$text =~ s/\s*\.\s*/ dot /g;
+		$text =~ s/\s*\.(\w)/ dot $1/g;
+	}
+	if ($Eflite_FH) {
+		if (length($text) == 1) {
+			if ($text eq '.') { print $Eflite_FH "s\nq { dot }\nd\n";
+			} else { print $Eflite_FH "s\nl {$text}\n";
+			}
+			if ($wait) { select(undef,undef,undef,0.5); }
+		} else {
+			print $Eflite_FH "s\nq {$text}\nd\n";
+			# useless emacspeak op: tts_sy nc_state all 0 0  1 225\nq {[:np  ]}
+			if ($wait) { select(undef,undef,undef,0.3+0.07*length($text)); }
 		}
-		print $Eflite_FH "s\nq {$text}\nd\n";
-		# useless emacspeak output: tts_sy nc_state all 0 0  1 225\nq {[:np  ]}
-		if ($wait) { select(undef,undef,undef,0.3+0.07*length($text)); }
+	} elsif ($Espeak) {
+		if ($Espeak_PID) { kill SIGHUP, $Espeak_PID; wait; $Espeak_PID = 0; }
+		$Espeak_PID = fork();
+		if ($Espeak_PID) {
+			if ($wait) {
+				if (length($text) == 1) { select(undef,undef,undef,0.5);
+				} else { select(undef,undef,undef,0.3+0.07*length($text));
+				}
+			}
+			return 1;
+		} else {
+			my $espeak_FH;
+			my $espeak_PID;
+			if ($espeak_PID = open($espeak_FH,'|-',$Espeak)) {
+				select((select($espeak_FH), $| = 1)[$[]); print $espeak_FH q{};
+			} else {
+				warn "can't run $Espeak: $!\n"; return;
+			}
+			# binmode($espeak_FH, ':unix');
+			sub huphandler { kill 'KILL', $espeak_PID; }
+			$SIG{HUP} = \&huphandler;
+			if ($text eq '.') { print $espeak_FH "dot\n";
+			} else { print $espeak_FH "$text\n";
+			}
+			# close $espeak_FH;   # Must Not Close! close Hangs, unkillable !
+			wait;
+			exit 0;
+		}
 	}
 }
 
@@ -1211,20 +1307,21 @@ I<linux>, I<gnome> and I<putty> terminals.
 There is an associated file selector, Term::Clui::FileSelect
 
 Since version 1.60, a speaking interface is provided
-for the visually-impaired user.
-It employs I<eflite>, which is also used by I<emacspeak>.
-Speech is turned on
-either if the I<EDITOR> environment variable is set to I<emacspeak>,
-or if the I<CLUI_SPEAK> environment variable is set to any non-empty string.
+for the visually-impaired user;
+it employs I<eflite> or I<espeak>.
+Speech is turned on if the I<CLUI_SPEAK> environment variable
+is set to any non-empty string.
+Since version 1.62, if I<speakup> is running,
+it is silenced while Term::Clui runs, and then restored.
 Because Term::Clui's metaphor for the computer
 is a human-like conversation-partner, this works very naturally.
 The application needs no modification.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.61/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
 
-This is Term::Clui.pm version 1.61
+This is Term::Clui.pm version 1.62
 
 =head1 WINDOW-SIZE
 
@@ -1426,6 +1523,11 @@ and if I<flite> is installed,
 then I<Term::Clui> will use I<flite>
 to speak its questions and choices out loud.
 
+If the environment variable I<CLUI_MOUSE> is set to I<OFF>
+then I<choose()> will not interpret mouse-clicks as making a choice.
+The advantage of this is that the mouse can then be used
+to highlight and paste text from this window as usual.
+
 I<Term::Clui> also consults the environment variables
 HOME, LOGDIR, EDITOR and PAGER, if they are set.
 
@@ -1491,13 +1593,17 @@ which were in turn based on some even older curses-based programs in I<C>.
  Term::Size
  http://www.pjb.com.au/
  http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
- perl(1)
- http://www.cpan.org/SITES.html
+ http://search.cpan.org/~pjb
  festival(1)
+ eflite(1)
+ espeak(1)
+ espeakup(1)
+ edbrowse(1)
  emacspeak(1)
+ perl(1)
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.61/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
 
 =cut
