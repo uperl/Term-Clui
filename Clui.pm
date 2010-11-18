@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.63';   # handles speakup, can use espeak, introduces CLUI_MOUSE
+$VERSION = '1.64';   # handles speakup, can use espeak, introduces CLUI_MOUSE
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -772,7 +772,7 @@ sub narrow_the_search { my @biglist = @_;
 			splice(@s, $i, 0, $c);
 			$n++; $i++; &puts($c);
 			foreach $j ($i..$n) { &puts($s[$j]); } &clrtoeol();  &left($n-$i);
-			&speak($c, 'wait');
+			&speak($c, 'wait');   # 1.63
 		} else { &beep();
 		}
 		# grep, and if $nchoices=1 return
@@ -1326,7 +1326,7 @@ There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
 http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
 
-This is Term::Clui.pm version 1.63
+This is Term::Clui.pm version 1.64
 
 =head1 WINDOW-SIZE
 
@@ -1609,6 +1609,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.63/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.64/py/TermClui.py
 
 =cut

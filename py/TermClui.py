@@ -60,12 +60,12 @@ from http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
 and put it in your PYTHONPATH.  TermClui.py depends on Python3.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.62
+Term::Clui and Term::Clui::FileSelect.  This is version 1.63
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.62'
+VERSION = '1.63'
 
 def _which(s):
     for d in os.getenv('PATH').split(':'):
@@ -652,6 +652,8 @@ ask() returns the string when the user presses Enter.
             if i > 0:
                  n -= 1
                  i -= 1
+                 if not _silent:   # 1.63
+                     _speak(s_a[i])
                  s_a.pop(i)   # splice(@s, $i, 1)
                  _left(1)
                  j = i
@@ -1096,6 +1098,7 @@ def _narrow_the_search(a_list):
             if i > 0:
                 n-=1
                 i-=1
+                _speak(s_a[i], wait=True)   # 1.63
                 s_a.pop(i)
                 _left(1)
                 j = i
@@ -1139,6 +1142,7 @@ def _narrow_the_search(a_list):
                     j += 1
                 _clrtoeol()
                 _left(n-i)
+                _speak(c, wait=True)   # 1.63
             else:
                 _beep()
 
