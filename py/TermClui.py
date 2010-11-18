@@ -1184,7 +1184,7 @@ def _ask_for_clue(nchoices, i, s):
             _clrtoeol()
             _goto(0,2)
             _puts("   give me a clue :             (or ctrl-X to quit)")
-            _left(31)
+            _left(31)   # 1.62
             _speak(str(nchoices)+" choices, give me a clue, or control-X to quit")
     else:
         _goto(0,1)

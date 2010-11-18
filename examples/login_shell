@@ -17,7 +17,7 @@ my $mailer = '';
 use Cwd; my $dir = cwd();
 
 while (1) {
-	my @tasks = ('Browser','Config','Change directory','Edit','FTP','Mail');
+	my @tasks = ('Browser','Config','ChDir','Edit','FTP', 'IRC','Mail');
 	if (-r './Makefile') { push (@tasks, 'Make'); }
 	push (@tasks, 'Manual', 'News');
 	if (-d "$home/.ssh") { push (@tasks, 'SSH'); }
@@ -31,10 +31,13 @@ while (1) {
 }
 sub Config {
 	my @files = grep (-w "$home/$_",
-	'.cshrc', '.efaxrc', '.exrc', '.fvwmrc', '.jnewsrc',
+	'.cshrc', '.efaxrc', '.emacspeak', '.edbrowse', '.exrc',
+	'.fvwmrc', '.html2psrc', '.jnewsrc',
 	'.login', '.lynxrc', 'lynx_bookmarks.html',
-	'.mailrc', '.netrc', '.newsrc', '.pinerc', '.popslurp', '.profile',
-	'.rhosts', '.sig', '.slrnrc', '.tiprc', '.xauth', '.Xauthority', '.xinitrc',
+	'.mailrc', '.mplayer/config', '.netrc', '.newsrc',
+	'.perltidyrc', '.pinerc', '.popslurp', '.profile',
+	'.rhosts', '.sig', '.slrnrc', '.ssh/config',
+	'.tiprc', '.xauth', '.Xauthority', '.xinitrc',
 	);
 	my $file;
 	$file = &choose("Edit which file ?", @files);
@@ -55,7 +58,7 @@ sub Browser {
 	}
 	system $browser;
 }
-sub Change_directory {
+sub ChDir {
 	my $newdir = &ask('to which directory ?');
 	return unless $newdir;
 	$newdir =~ s/^~\//$home\//;
@@ -96,17 +99,31 @@ sub FTP {
 	} else { system "ftp $task";
 	}
 }
+sub IRC {
+	if (! $ircclient) {
+		my ($bin, $prog);
+		DIR: foreach $bin (@path) {
+			foreach $prog ('sirc','tinyirc') {
+				if (-e "$bin/$prog") { $ircclient = "$bin/$prog"; last DIR; }
+			}
+		}
+	}
+	if (! $ircclient) {
+		&sorry("can't find a ircclient: tried sirc and tinyirc") ; return;
+	}
+	system $ircclient;
+}
 sub Mail {
 	if (! $mailer) {
 		my ($bin, $prog);
 		DIR: foreach $bin (@path) {
-			foreach $prog ('pine', 'elm') {
+			foreach $prog ('alpine','pine', 'elm') {
 				if (-e "$bin/$prog") { $mailer = "$bin/$prog"; last DIR; }
 			}
 		}
 	}
 	if (! $mailer) {
-		&sorry("can't find a mailer: tried pine and elm") ; return;
+		&sorry("can't find a mailer: tried alpine, pine and elm") ; return;
 	}
 	system $mailer;
 }
@@ -139,11 +156,12 @@ sub News {
 	system 'slrn';  # /usr/bin/trn ?
 }
 sub SSH {
+ 	# make sure ~/.ssh/config contains:  HashKnownHosts no
 	if (! open(F,"$home/.ssh/known_hosts")) {
 		&sorry("can't open $home/.ssh/known_hosts: $!"); return;
 	}
 	my (%hosts);
-	while (<F>) { if (/^(\S+)\s/) { $hosts{$1}++; } }
+	while (<F>) { if (/^([.\w]+)/) { $hosts{$1}++; } }
 	close F;
 	my @hosts = sort keys %hosts;
 	my $host = &choose('SSH to :', @hosts, 'Somewhere else');

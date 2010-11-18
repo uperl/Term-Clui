@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.62';   # handles speakup, can use espeak, introduces CLUI_MOUSE
+$VERSION = '1.63';   # handles speakup, can use espeak, introduces CLUI_MOUSE
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -442,7 +442,9 @@ sub ask { my ($question, $default) = @_;
 			}
 		} elsif (($c eq "\cH") || ($c eq "\c?")) {
 			if ($i > 0) {
-			 	$n--; $i--; splice(@s, $i, 1); &left(1);
+			 	$n--; $i--;
+				if (! $silent) { &speak($s[$i]); }   # 1.63
+				splice(@s, $i, 1); &left(1);
 			  	foreach $j ($i .. $n) { &puts($s[$j]); }
 			  	&clrtoeol(); &left($n-$i);
 			}
@@ -747,7 +749,9 @@ sub narrow_the_search { my @biglist = @_;
 			if ($i < $n) { &puts($s[$i]); $i++; next; }
 		} elsif (($c eq "\cH") || ($c eq "\c?")) {
 			if ($i > 0) {
-			 	$n--; $i--; splice(@s, $i, 1); &left(1);
+			 	$n--; $i--;
+				&speak($s[$i], 'wait');   # 1.63
+				splice(@s, $i, 1); &left(1);
 			  	foreach $j ($i..$n) { &puts($s[$j]); }
 				&clrtoeol(); &left($n-$i);
 			}
@@ -768,6 +772,7 @@ sub narrow_the_search { my @biglist = @_;
 			splice(@s, $i, 0, $c);
 			$n++; $i++; &puts($c);
 			foreach $j ($i..$n) { &puts($s[$j]); } &clrtoeol();  &left($n-$i);
+			&speak($c, 'wait');
 		} else { &beep();
 		}
 		# grep, and if $nchoices=1 return
@@ -1321,7 +1326,7 @@ There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
 http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
 
-This is Term::Clui.pm version 1.62
+This is Term::Clui.pm version 1.63
 
 =head1 WINDOW-SIZE
 
@@ -1604,6 +1609,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.63/py/TermClui.py
 
 =cut
