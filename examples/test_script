@@ -175,6 +175,10 @@ EOT
 	);
 	$name = &ask("Choose a name which rhymes with $colour :", $names{$colour});
 	warn "string=$string, name=$name\n";
+	my $passwd = ask_password("Enter some password:");
+	warn "that password was ".length($passwd)." chars long\n";
+	my $f = ask_filename("filename ?\n\ntry out the tab-filename-completion");
+	warn "that filename was $f\n";
 }
 
 sub test_edit {

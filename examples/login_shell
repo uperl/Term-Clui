@@ -8,7 +8,7 @@
 #########################################################################
 
 use Term::Clui;
-# require '../Clui.pm'; import Term::Clui;
+use Term::Clui::FileSelect;
 my $home = $ENV{'HOME'} || $ENV{'LOGDIR'}  || (getpwuid($<))[7];
 my $user = $ENV{'USER'} || $ENV{'LOGNAME'} || (getpwuid($<))[0];
 my @path = split ':', $ENV{PATH};
@@ -21,6 +21,7 @@ while (1) {
 	if (-r './Makefile') { push (@tasks, 'Make'); }
 	push (@tasks, 'Manual', 'News');
 	if (-d "$home/.ssh") { push (@tasks, 'SSH'); }
+	push (@tasks, 'View');
 
 	my $shortdir = $dir;
 	if ((index $shortdir,$home)==0) {substr($shortdir,0,(length $home))= '~';}
@@ -172,6 +173,10 @@ sub SSH {
 	} else { system "ssh $host";
 	}
 }
+sub View {
+	my $file = select_file(-Readable=>1);
+	&view($file);
+}
 
 =pod
 
@@ -182,7 +187,7 @@ login_shell - wrapper for text-based browser, mail, news, ssh, ftp etc.
 
 =head1 SYNOPSIS
 
-$ audio_stuff
+$ login_shell
 
 =head1 DESCRIPTION
 

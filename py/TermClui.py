@@ -60,12 +60,12 @@ from http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
 and put it in your PYTHONPATH.  TermClui.py depends on Python3.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.63
+Term::Clui and Term::Clui::FileSelect.  This is version 1.65
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.63'
+VERSION = '1.65'
 
 def _which(s):
     for d in os.getenv('PATH').split(':'):

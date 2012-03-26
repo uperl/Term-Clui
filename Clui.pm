@@ -8,11 +8,12 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.64';   # handles speakup, can use espeak, introduces CLUI_MOUSE
+$VERSION = '1.65';   # ask_filename introduced; view displays .doc files
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw(ask_password ask confirm choose help_text edit sorry view inform);
+@EXPORT = qw(ask ask_password ask_filename confirm
+ choose help_text edit sorry view inform);
 @EXPORT_OK = qw(beep tiview back_up get_default set_default timestamp);
 %EXPORT_TAGS = (ALL => [@EXPORT,@EXPORT_OK]);
 
@@ -405,6 +406,20 @@ $SIG{'WINCH'} = sub { $size_changed = 1; };
 # default could be just one more option, and backward compatibilty
 # could be preserved by checking whether the 2nd arg is a hashref ...
 
+sub ask_filename { my ($question, $default) = @_;  # 1.65 tab-completion
+	eval 'require Term::ReadLine'; if ($@) {
+		sorry("you should install Term::ReadLine::Gnu from www.cpan.org");
+		return ask($question, $default);
+	}
+	initscr(speakup_silent=>1);
+	my $nol = display_question($question);
+	endwin();
+	$term = new Term::ReadLine 'ProgramName';
+	# print STDERR "$question ";
+	my $filename = $term->readline('');
+	print STDERR "\e[J";
+	return $filename;
+}
 sub ask_password { # no echo - use for passwords
 	local ($silent) = 'yes'; &ask($_[$[]);
 }
@@ -1058,15 +1073,30 @@ foreach $f ("/usr/bin/less", "/usr/bin/more") {
 	if (-x $f) { $default_pager = $f; }
 }
 sub view {	my ($title, $text) = @_;	# or ($filename) =
+	my $pager = $ENV{PAGER} || $default_pager;
 	if (! $text && -T $title && open(F,"< $title")) {
 		$nlines = 0;
 		while (<F>) { last if ($nlines++ > $maxrows); } close F;
 		if ($nlines > (0.6*$maxrows)) {
-			system (($ENV{PAGER} || $default_pager) . " \'$title\'");
+			system "$pager  \'$title\'";
 		} else {
 			open(F,"< $title"); undef $/; $text=<F>; $/="\n"; close F;
 			&tiview($title, $text);
 		}
+	} elsif (! $text && ($title =~ /\.doc$/i) && -r $title) {   # 1.65
+		my $wvText = which('wvText');   if ($wvText) {
+			my $tmpf = "/tmp/wv$$";
+			system "$wvText \'$title\' $tmpf"; system "$pager $tmpf";
+			unlink $tmpf; return 1;
+		}
+		my $antiword = which('antiword');   if ($antiword) {
+			system "$antiword -i 1 \'$title\' | $pager"; return 1;
+		}
+		my $catdoc = which('catdoc');   if ($catdoc) {
+			system "$catdoc \'$title\' | $pager"; return 1;
+		}
+		sorry("it's a .doc file; you need to install wv, antiword or catdoc");
+		return 0;
 	} else {
 		local (@lines) = split(/\r?\n/, $text, $maxrows);
 		if (($#lines - $[) < 21) {
@@ -1076,7 +1106,7 @@ sub view {	my ($title, $text) = @_;	# or ($filename) =
 			local ($tmp) = "/tmp/$safetitle.$$";
 			if (!open(TMP, ">$tmp")) {warn "can't open $tmp: $!\n"; return;}
 			print TMP $text;	close TMP;
-			system(($ENV{PAGER} || $default_pager) . " \'$tmp\'");
+			system "$pager \'$tmp\'";
 			unlink $tmp;
 			return 1;
 		}
@@ -1326,7 +1356,7 @@ There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
 http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
 
-This is Term::Clui.pm version 1.64
+This is Term::Clui.pm version 1.65
 
 =head1 WINDOW-SIZE
 
@@ -1357,16 +1387,28 @@ they are displayed as a choice.
 
 Asks the user the question and returns a string answer,
 with no newline character at the end.
-If the optional second argument is present, it is offered to the user
-as a default.
+If the optional second argument is present,
+it is offered to the user as a default.
+If the I<$question> is multi-line,
+the entry-field is at the top to the right of the first line,
+and the subsequent lines are formatted within the
+screen width and displayed beneath, as with I<choose>.
+
 For the user, left and right arrow keys move backward and forward
 through the string, delete and backspace erase the previous character,
 ctrl-A moves to the beginning, ctrl-E to the end,
-and ctrl-C, ctrl-D or ctrl-X clear the current string.
+and ctrl-D or ctrl-X clear the current string.
 
 =item I<ask_password>( $question );
 
 Does the same with no echo, as used for password entry.
+
+=item I<ask_filename>( $question );
+
+Uses I<Term::ReadLine::Gnu> to provide filename-completion with
+the I<Tab> key, but also displays multi-line questions in the
+same way as I<ask> and I<choose> do.
+This function was introduced in version 1.65.
 
 =item I<choose>( $question, @list );
 
@@ -1453,6 +1495,11 @@ Otherwise it uses a simple built-in routine which expects either "q"
 or I<Return> from the user; if the user presses I<Return>
 the displayed text remains on the screen and the dialogue continues
 after it, if the user presses "q" the text is erased.
+
+If there is only one argument and it's a filename,
+then the user's PAGER displays it,
+except (since 1.65) if it's a I<.doc> file, when either
+I<wvText>, I<antiword> or I<catdoc> is used to extract its contents first.
 
 =item I<help_text>( $mode );
 
@@ -1609,6 +1656,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.64/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.65/py/TermClui.py
 
 =cut

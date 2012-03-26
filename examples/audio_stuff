@@ -43,8 +43,10 @@ my $aplaymidi    = which('aplaymidi');
 my $arecordmidi  = which('arecordmidi');
 my $cdda2wav     = which('icedax') || which('cdda2wav');
 my $cdrecord     = which('cdrecord') || which('wodim');
+my $dvdbackup    = which('dvdbackup');
 my $eject        = which('eject');
 my $festival     = which('festival');
+my $growisofs    = which('growisofs');
 my $lame         = which('lame');
 my $man          = which('man');
 my $mkisofs      = which('mkisofs') || which ('genisoimage');
@@ -119,10 +121,10 @@ sub bristol {
 	return unless $long;
 	my $out_file = ask("save output to wav file (return = don't save) ?");
 	if (! $out_file) {
-		system "$startBristol -$long2short{$long}";
+		system "$startBristol -alsa -$long2short{$long}";
 	} else {
 		$out_file =~ s/\.WAV$//i;
-		system "$startBristol -$long2short{$long} -o $out_file.raw";
+		system "$startBristol -alsa -$long2short{$long} -o $out_file.raw";
 		if (!$sox) {
 			sorry("you need to install sox to convert raw to wav."); return;
 		}
@@ -136,7 +138,6 @@ sub burn_wav {
 	return unless @files;
 	my $files = join "' '", @files;
 	ask("insert the C D into the drive, and press Return");
-	# if ($eject) { system $eject; }
 	system "$cdrecord dev=0,0 -v -dao -pad -speed=12 -copy '$files'";
 	inform("finished burning the C D");
 	if ($eject) { system $eject; }
@@ -179,7 +180,6 @@ sub burn_files {
 	system "$mkisofs -gui -r -J -T -allow-limited-size"
 	 ." -V DataCD -o $tmpfile $tmp_dir 2>&1 | perl -pe 's/\$/\\e[K\\e[A/'";
 	print "\n";
-	# if ($eject) { system $eject; }
 	system("rm","-rf",$tmp_dir);
 	# could mount -o loop $tmpfile and check it's OK ...
 	if ($eject) { system $eject; }
@@ -206,7 +206,6 @@ sub copy_cd {
 	if (! chdir $tmpdir) { sorry("can't chdir $tmpdir: $!"); $ok=0; }
 	return unless $ok;
 	ask("insert the C D into the drive, and press Return");
-	if ($eject) { system $eject; }
 	system "$cdda2wav dev=/dev/cdrom -vall cddb=0 -B -Owav";
 	if ($eject) { system $eject; }
 	while (1) {
@@ -220,48 +219,69 @@ sub copy_cd {
 }
 sub copy_dvd {
 	my $ok = 1;
+	if (!$dvdbackup) {sorry("you need to install dvdbackup.");  $ok=0;}
 	if (!$mkisofs){sorry("you need to install mkisofs or genisoimage.");$ok=0;}
-	if (!$cdrecord) {sorry("you need to install cdrecord or wodim.");  $ok=0;}
+	if (!$growisofs) {sorry("you need to install growisofs.");  $ok=0;}
 	if (! -e '/dev/cdrom') { sorry("can't find /dev/cdrom"); $ok = 0;
 	} elsif (! -w '/dev/cdrom') { sorry("can't write to /dev/cdrom"); $ok=0;
 	}
-	my $tmpfile = "/tmp/dvd_$$";
+	my $tmpfile = "/tmp/dvd_$$.iso";
 	my $tmp_mnt = "/tmp/mnt_$$";
 	if (! mkdir $tmp_mnt) { sorry("can't mkdir $tmp_mnt: $!"); $ok=0; }
 	return unless $ok;
-	if ($eject) { system $eject; }
 	ask("insert the DVD into drive, and press Return...");
+
+	## The old non-dvdcss-capable method using  mount ...
 	# system "mount -t iso9660 -o ro,map=off /dev/cdrom $tmp_mnt";
-	# should sleep, try, sleep, retry up to about 15 sec ...
-	my $return_code;
-	foreach (1..5) {
-		sleep 2;
-		$return_code = system "mount -t udf -o ro /dev/cdrom $tmp_mnt";
-		last unless $return_code;
-		sleep 2;
+	#my $return_code;
+	#foreach (1..5) {  # sleep, try, sleep, retry up to about 15 sec ...
+	#	sleep 2;
+	#	$return_code = system "mount -t udf -o ro /dev/cdrom $tmp_mnt";
+	#	last unless $return_code;
+	#	sleep 2;
+	#}
+	#if ($return_code) { sorry("couldn't mount the DVD"); return 0; }
+	#if (! -d "$tmp_mnt/VIDEO_TS" and ! -d "$tmp_mnt/video_ts") {
+	#	sorry("not a video DVD; can't see a /VIDEO_TS directory");
+	#	system "ls -lR $tmp_mnt ; umount $tmp_mnt";
+	#	if (! rmdir $tmp_mnt) { warn "can't rmdir $tmp_mnt: $!\n"; }
+	#	return 0;
+	#}
+	#system "ls -lR $tmp_mnt/*";
+
+	system "$dvdbackup -v -M -o $tmp_mnt -i /dev/cdrom";  # uses libdvdcss!
+	# discover the DVD's title
+	my $dh; opendir($dh, $tmp_mnt) or die "can't opendir $tmp_mnt: $!";
+	my @ds = grep { !/^\./ && -d "$tmp_mnt/$_" } readdir($dh);
+	closedir $dh;
+	if (! @ds) { die "no directories found in $tmp_mnt/\n"; }
+	my $title = $ds[$[];
+	if (1 != scalar @ds) {
+		warn "directories @ds found in $tmp_mnt/ , using $title\n";
 	}
-	if ($return_code) { sorry("couldn't mount the DVD"); return 0; }
-	if (! -d "$tmp_mnt/VIDEO_TS" and ! -d "$tmp_mnt/video_ts") {
-		sorry("not a video DVD; can't see a /VIDEO_TS directory");
-		system "ls -lR $tmp_mnt ; umount $tmp_mnt";
-		if (! rmdir $tmp_mnt) { warn "can't rmdir $tmp_mnt: $!\n"; }
-		return 0;
-	}
-	system "ls -lR $tmp_mnt/*";
+	mkdir "$tmp_mnt/$title/AUDIO_TS";
+	
+    # mkisofs -dvd-video -o i1.img d1/NAQOYQATSI/
+    # growisofs -dvd-compat -Z /dev/sr0=i1.img
+
 	# suppress line-feeds in the progress-bar (on stderr) ...
 	system "$mkisofs -gui -r -J -T -dvd-video -allow-limited-size"
-	 ." -V Video_DVD -o $tmpfile $tmp_mnt 2>&1 | perl -pe 's/\$/\\e[K\\e[A/'";
-	system "umount $tmp_mnt";
+	 ." -V Video_DVD -o $tmpfile $tmp_mnt/$title"
+	 ." 2>&1 | perl -pe 's/\$/\\e[K\\e[A/'";
+	#system "umount $tmp_mnt";
 	print "\n";
 	if ($eject) { system $eject; }
-	if (! rmdir $tmp_mnt) { warn "can't rmdir $tmp_mnt: $!\n"; }
-	# could mount -o loop $tmpfile and check it's OK ...
+	# if (! rmdir $tmp_mnt) { warn "can't rmdir $tmp_mnt: $!\n"; }
+	use File::Path; File::Path::remove_tree("$tmp_mnt");
+	system "ls -l $tmpfile";
+	# to be fussy, could  mount -o loop $tmpfile  and check it's OK ...
 	while (1) {
-		ask("insert blank DVD into drive and press Return...");
+		ask("insert blank DVD into drive, wait for light to go out, then press Return...");
 		# suppress line-feeds in the progress-bar (on stderr) ...
 		# should sleep, try, sleep, retry up to about 15 sec ...
 		system "growisofs -dvd-compat -Z /dev/cdrom=$tmpfile"
 		 . "  2>&1 | perl -pe 's/\$/\\e[K\\e[A/'";
+		warn "\n";
 		if ($eject) { system $eject; }
 		last unless confirm "do you want to write that to another DVD ?";
 	}
@@ -371,6 +391,7 @@ sub mp32wav {
 	}
 }
 sub mid2wav {
+	# should also offer replay-through-xv2020, and sox -t alsa hw:4,0
 	if (! $timidity)  { sorry("you need to install timidity.");  return; }
 	if (! $normalize) {
 		sorry("you need to install normalize-audio or normalize."); return;
@@ -395,6 +416,7 @@ sub mid2mp3 {
 	if (! $lame)      { sorry("you need to install lame.");      return; }
 	my @files = select_file(-FPat=>'*.mid', -Path=>$ENV{PWD}, -Chdir=>0);
 	my @wavs = ();
+	return unless @files;
 	foreach my $i (@files) {
 		my $o = $i; $o =~ s/mid$/wav/; push @wavs, $o;
 		if (-f $o && !confirm("OK to overwrite $o ?")) { next; }
@@ -469,7 +491,7 @@ sub audio2wav {
 	}
 	# could offer options, like gain, compand, autostart on signal...
 	# must convert to 44100 Hz :-)
-	system "$rec -r 44100 -c 2 $file";
+	system "$rec -c 2 $file rate 44100";
 }
 sub midi_in_port {
 	if (! $aconnect) { sorry("you need to install aconnect."); return; }
