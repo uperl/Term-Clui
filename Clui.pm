@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.65';   # ask_filename introduced; view displays .doc files
+$VERSION = '1.66';   # 
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -418,6 +418,7 @@ sub ask_filename { my ($question, $default) = @_;  # 1.65 tab-completion
 	# print STDERR "$question ";
 	my $filename = $term->readline('');
 	print STDERR "\e[J";
+	$filename =~ s/ $//;   # 1.66
 	return $filename;
 }
 sub ask_password { # no echo - use for passwords
@@ -1074,7 +1075,21 @@ foreach $f ("/usr/bin/less", "/usr/bin/more") {
 }
 sub view {	my ($title, $text) = @_;	# or ($filename) =
 	my $pager = $ENV{PAGER} || $default_pager;
-	if (! $text && -T $title && open(F,"< $title")) {
+	if (! $text and ($title =~ /\.doc$/i) and -r $title) {   # 1.65
+		my $wvText = which('wvText');   if ($wvText) {
+			my $tmpf = "/tmp/wv$$";
+			system "$wvText '$title' $tmpf"; system "$pager $tmpf";
+			unlink $tmpf; return 1;
+		}
+		my $antiword = which('antiword');   if ($antiword) {
+			system "$antiword -i 1 '$title' | $pager"; return 1;
+		}
+		my $catdoc = which('catdoc');   if ($catdoc) {
+			system "$catdoc '$title' | $pager"; return 1;
+		}
+		sorry("it's a .doc file; you need to install wv, antiword or catdoc");
+		return 0;
+	} elsif (! $text && -T $title && open(F,"< $title")) {
 		$nlines = 0;
 		while (<F>) { last if ($nlines++ > $maxrows); } close F;
 		if ($nlines > (0.6*$maxrows)) {
@@ -1083,20 +1098,6 @@ sub view {	my ($title, $text) = @_;	# or ($filename) =
 			open(F,"< $title"); undef $/; $text=<F>; $/="\n"; close F;
 			&tiview($title, $text);
 		}
-	} elsif (! $text && ($title =~ /\.doc$/i) && -r $title) {   # 1.65
-		my $wvText = which('wvText');   if ($wvText) {
-			my $tmpf = "/tmp/wv$$";
-			system "$wvText \'$title\' $tmpf"; system "$pager $tmpf";
-			unlink $tmpf; return 1;
-		}
-		my $antiword = which('antiword');   if ($antiword) {
-			system "$antiword -i 1 \'$title\' | $pager"; return 1;
-		}
-		my $catdoc = which('catdoc');   if ($catdoc) {
-			system "$catdoc \'$title\' | $pager"; return 1;
-		}
-		sorry("it's a .doc file; you need to install wv, antiword or catdoc");
-		return 0;
 	} else {
 		local (@lines) = split(/\r?\n/, $text, $maxrows);
 		if (($#lines - $[) < 21) {
@@ -1299,7 +1300,8 @@ Term::Clui.pm - Perl module offering a Command-Line User Interface
 
  $answer = ask($question);
  $answer = ask($question,$suggestion);
- $password = ask_password("Enter password : ");
+ $password = ask_password("Enter password:");
+ $filename = ask_filename("Which file ?");  # with Tab-completion
 
  $newtext = edit($title, $oldtext);
  edit($filename);
@@ -1356,7 +1358,7 @@ There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
 http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
 
-This is Term::Clui.pm version 1.65
+This is Term::Clui.pm version 1.66
 
 =head1 WINDOW-SIZE
 
@@ -1506,10 +1508,10 @@ I<wvText>, I<antiword> or I<catdoc> is used to extract its contents first.
 This returns a short help message for the user.
 If I<mode> is "ask" then the text describes the keys the user has available
 when responding to an I<&ask> question;
-If I<mode> is "multi" then then the text describes the keys
+If I<mode> is "multi" then the text describes the keys
 and mouse actions the user has available
 when responding to a multiple-choice I<&choose> question;
-Otherwise, the the text describes the keys
+otherwise, the text describes the keys
 and mouse actions the user has available
 when responding to a single-choice I<&choose>.
 
@@ -1537,7 +1539,7 @@ Returns a sortable timestamp string in "YYYYMMDD hhmmss" form.
 Consults the database I<~/.clui_dir/choices> or
 I<$ENV{CLUI_DIR}/choices> and returns the choice that
 the user made the last time this question was asked.
-Is is better than opening the database directly
+This is better than opening the database directly
 as it handles DBM's problem with concurrent accesses.
 
 =item I<set_default>( $question, $new_default )
@@ -1545,7 +1547,7 @@ as it handles DBM's problem with concurrent accesses.
 Opens the database I<~/.clui_dir/choices> or
 I<$ENV{CLUI_DIR}/choices> and sets the default response which will
 be offered to the user made the next time this question is asked.
-Is is better than opening the database directly
+This is better than opening the database directly
 as it handles DBM's problem with concurrent accesses.
 
 =back
@@ -1656,6 +1658,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.65/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.66/py/TermClui.py
 
 =cut

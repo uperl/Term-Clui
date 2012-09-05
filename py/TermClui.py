@@ -11,6 +11,7 @@ a Python3 module offering a Command-Line User Interface
  answer = ask(question)
  answer = ask(question, suggestion)
  password = ask_password("Enter password : ")
+ filename = ask_filename("Which file ?")
  newtext = edit(title, oldtext)
  edit(filename)
  view(title, text)  # if title is not a filename
@@ -592,6 +593,22 @@ def ask_password(question):
     r'''Like ask, but with no echo. Use it for passwords.'''
     global _silent
     _silent = True
+    ask(question)
+
+def ask_filename(question):
+    r'''Uses the readline module to provide filename-completion with the Tab
+key, but also displays multi-line questions in the same way as ask()
+and choose() do.  This function was introduced in version 1.65.'''
+    import readline
+    _initscr(speakup_silent=True)
+    nol = _display_question(question)
+    _endwin()
+    # to what extent can this readline do anything but complete py builtins?
+    #$term = new Term::ReadLine 'ProgramName';
+    ## print STDERR "$question ";
+    #my $filename = $term->readline('');
+    #print STDERR "\e[J";
+    #return $filename;
     ask(question)
 
 def ask(question, default=''):
@@ -1594,6 +1611,7 @@ or less, it is just printed; in between, a built-in tiny pager is
 used which offers the user the choices "q" to clear the text and
 continue, or Enter to leave the text on the screen and continue.
 '''
+    # 1.65 if it's a .doc file, then wvText, antiword or catdoc should be used
     global _OpenFile
     pager = os.getenv('PAGER')
     if not pager:
@@ -1681,12 +1699,11 @@ def _tiview(title='', text=''):
 def help_text(mode=''):
     '''
 This returns a short help message for the user.  If mode is "ask" then
-the text describes the keys the user has available when responding to
-an ask() question;  If mode is "multi" then then the text describes the
-keys and mouse actions the user has available when responding to a
-multiple-choice choose() question;  Otherwise, the the text describes
-the keys and mouse actions the user has available when responding to
-a single-choice choose().
+the text describes the keys the user has available when responding to an
+ask() question;  If mode is "multi" then the text describes the keys and
+mouse actions the user has available when responding to a multiple-choice
+choose() question;  otherwise, it describes the keys and mouse actions
+the user has available when responding to a single-choice choose().
 '''
     if mode == 'ask':
         return "\nLeft and Right arrowkeys, Backspace, Delete; control-B = beginning; control-E = end; control-X = clear; then Return."
@@ -1715,9 +1732,9 @@ def _speak(text, wait=None):   # 1.60
     if _Eflite_FH:
         if len(text) == 1:
             if text == '.':
-            	_Eflite_FH.write(bytes("s\nq { dot }\nd\n",'ISO-8859-1'))
+                _Eflite_FH.write(bytes("s\nq { dot }\nd\n",'ISO-8859-1'))
             else:
-            	_Eflite_FH.write(bytes("s\nl {"+text+"}\n",'ISO-8859-1'))
+                _Eflite_FH.write(bytes("s\nl {"+text+"}\n",'ISO-8859-1'))
             _Eflite_FH.flush()
             if wait:
                 time.sleep(0.5)

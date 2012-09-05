@@ -31,6 +31,8 @@
 #  .mpg files can be played with
 #  sndfile-play whatever.mpg  or with mplayer or mpg123
 
+my $BigTmp = $ENV{'BIGTMP'} || '/tmp';
+
 use Cwd qw(chdir);
 use Term::Clui;
 use Term::Clui::FileSelect;
@@ -86,6 +88,7 @@ while (1) {
 	} elsif ($task eq 'encode WAV->MP2')    { wav2mp2();
 	} elsif ($task eq 'encode WAV->MP3')    { wav2mp3();
 	} elsif ($task eq 'list Soundfont')     { list_soundfont();
+	} elsif ($task eq 'play AudioCD')       { play_cd();
 	} elsif ($task eq 'play MIDI,WAV,MP3')  { play();
 	} elsif ($task eq 'record AudioIn->WAV') { audio2wav();
 	} elsif ($task eq 'record Keyboard->MIDI') { kbd2mid();
@@ -151,8 +154,8 @@ sub burn_files {
 	if (! -e '/dev/cdrom') { sorry("can't find /dev/cdrom"); $ok = 0;
 	} elsif (! -w '/dev/cdrom') { sorry("can't write to /dev/cdrom"); $ok=0;
 	}
-	my $tmpfile = "/tmp/cd_$$";
-	my $tmp_dir = "/tmp/mnt_$$";
+	my $tmpfile = "$BigTmp/cd_$$";
+	my $tmp_dir = "$BigTmp/mnt_$$";
 	if (! mkdir $tmp_dir) { sorry("can't mkdir $tmp_dir: $!"); $ok=0; }
 	return unless $ok;
 	# must choose_files repeatedly to within size limit
@@ -200,7 +203,7 @@ sub copy_cd {
 	if (! -e '/dev/cdrom') { sorry("can't find /dev/cdrom"); $ok = 0;
 	} elsif (! -w '/dev/cdrom') { sorry("can't write to /dev/cdrom"); $ok=0;
 	}
-	my $tmpdir = "/tmp/audio_stuff_$$";
+	my $tmpdir = "$BigTmp/audio_stuff_$$";
 	if (! mkdir $tmpdir) { sorry("can't mkdir $tmpdir: $!"); $ok=0; }
 	my $olddir = 'pwd';
 	if (! chdir $tmpdir) { sorry("can't chdir $tmpdir: $!"); $ok=0; }
@@ -225,8 +228,8 @@ sub copy_dvd {
 	if (! -e '/dev/cdrom') { sorry("can't find /dev/cdrom"); $ok = 0;
 	} elsif (! -w '/dev/cdrom') { sorry("can't write to /dev/cdrom"); $ok=0;
 	}
-	my $tmpfile = "/tmp/dvd_$$.iso";
-	my $tmp_mnt = "/tmp/mnt_$$";
+	my $tmpfile = "$BigTmp/dvd_$$.iso";
+	my $tmp_mnt = "$BigTmp/mnt_$$";
 	if (! mkdir $tmp_mnt) { sorry("can't mkdir $tmp_mnt: $!"); $ok=0; }
 	return unless $ok;
 	ask("insert the DVD into drive, and press Return...");
@@ -317,14 +320,8 @@ sub speak {
 	print P $_[$[];
 	close P;
 }
-sub rip_wav {
-	if (!$cdda2wav) {sorry("you need to install cdda2wav or icedax."); return;}
-	set_cdda_device() || return;
-	my $task = choose('Extract', 'All tracks', 'Just one track');
-	return unless $task;
-	if ($task eq 'All tracks') {
-		system "$cdda2wav cddb=0 -H -B -Owav"; return;
-	}
+
+sub which_track {  my $do_what = $_[$[];
 	# cdda2wav produces its output on stderr ARRGghhh :-(
 	if (! open (P, "$cdda2wav -Q -H -g -v toc -J 2>&1 |")) {
 		die "can't run $cdda2wav: $!\n";
@@ -332,7 +329,6 @@ sub rip_wav {
 	my @toc = <P>;
 	close P;
 	my @tracks, @header;
-
 	foreach (@toc) {
 		next if /^\s*#/;
 		next if /not detected/;
@@ -345,18 +341,45 @@ sub rip_wav {
 		}
 	}
 	print join("\n", @header), "\n";
+	$track = choose("$do_what which track ?", @tracks);
+	$track =~ s/^\s*T0?//;
+	$track =~ s/:?\s+.*$//;
+	if ($track =~ /^\d$/) { $track = "0$track"; }
+	return $track;
+}
 
+sub play_cd {
+	if (!$cdda2wav) {sorry("you need to install cdda2wav or icedax."); return;}
+	set_cdda_device() || return;
+	my $task = choose('Play', 'All tracks', 'Just one track');
+	return unless $task;
+	if ($task eq 'All tracks') {
+		system "$cdda2wav cddb=0 -H -B -e -N"; return;
+	}
+	my $track = which_track('Play');
+	if ($track) { system "$cdda2wav -H -Q -x -e -N -t $track+$track"; }
+}
+
+sub rip_wav {
+	if (!$cdda2wav) {sorry("you need to install cdda2wav or icedax."); return;}
+	set_cdda_device() || return;
+	my $task = choose('Extract', 'All tracks', 'Just one track');
+	return unless $task;
+	if ($task eq 'All tracks') {
+		system "$cdda2wav cddb=0 -H -B -Owav"; return;
+	}
 	$track = choose('Extract which track ?', @tracks);
 	$track =~ s/^\s*T0?//;
 	$track =~ s/:?\s+.*$//;
 	if ($track =~ /^\d$/) { $track = "0$track"; }
-	my $filename = ask('to what filename ?', "${track}_track.wav");
-	if ($filename && ($filename !~ /\.wav$/i)) { $filename .= '.wav'; }
-
+	my $track = which_track('Extract');
 	if ($track) {
+		my $filename = ask('to what filename ?', "${track}_track.wav");
+		if ($filename && ($filename !~ /\.wav$/i)) { $filename .= '.wav'; }
 		system "$cdda2wav -H -Q -x -Owav -t $track+$track $filename";
 	}
 }
+
 sub rip_mp3 {
 }
 sub wav2mp3 {
@@ -762,14 +785,19 @@ sub timiditycfg {
 }
 sub set_cdda_device {
 	if ($ENV{CDDA_DEVICE}) { return 1; }
+	inform(" you should set the CDDA_DEVICE environment variable!");
 	if (-e "/dev/cdrom") {
 		$ENV{CDDA_DEVICE} = '/dev/cdrom:@';
 		inform("using $ENV{CDDA_DEVICE} ...");
 		return 1;
 	}
-	inform("You should set the CDDA_DEVICE environment variable!");
-	if (! open (P, "$cdrecord -scanbus |")) {   # will only run as root:-(
-		warn "can't run cdrecord -scanbus: $!\n";
+	system "eject"; system "eject -t"; sleep 3;
+	if ($>) {
+		warn " you need to be root to run  cdrecord -scanbus\n";
+		$ENV{CDDA_DEVICE} = '0,0,0';
+		warn "trying CDDA_DEVICE='0,0,0'\n";
+	} elsif (! open (P, "$cdrecord -scanbus |")) {
+		warn "can't run cdrecord -scanbus: $!\n"; return 0;
 	} else {
 		my @devices;
 		while (<P>) {
@@ -795,7 +823,7 @@ sub tasks {
 		'change Directory', 'configure Timidity', 'connect MIDIports',
 		'convert MIDI->MP3', 'convert MIDI->WAV', 'convert Muscript->MIDI',
 		'copy audio CD', 'copy video DVD', 'decode MP3->WAV',
-		'edit Muscript', 'encode WAV->MP2', 'encode WAV->MP3',
+		'edit Muscript', 'encode WAV->MP2', 'encode WAV->MP3', 'play AudioCD',
 		'rip AudioCD->WAV', 'rip MP3CD->MP3', 'play MIDI,WAV,MP3',
 		'record AudioIn->WAV', 'record Keyboard->MIDI', 'run alsamixer',
 	);
@@ -903,6 +931,15 @@ or I<play> or I<sndfile-play> to play a I<.wav> file to the headphones,
 or I<aplaymidi> to send a I<.mid> file to a Synthesiser.
 
 =back
+
+=head1 ENVIRONMENT
+
+When copying DVDs some big temporary files are created;
+if your I</tmp> is too small you can create a B<BIGTMP>
+environment variable to use somewhere else, e.g.:
+
+ export BIGTMP=/home/tmp
+ audio_stuff
 
 =head1 AUTHOR
 
