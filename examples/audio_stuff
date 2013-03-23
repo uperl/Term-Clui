@@ -159,7 +159,7 @@ sub burn_files {
 	if (! mkdir $tmp_dir) { sorry("can't mkdir $tmp_dir: $!"); $ok=0; }
 	return unless $ok;
 	# must choose_files repeatedly to within size limit
-	my $max_mb = 670;
+	my $max_mb = 800;
 	while (1) {
 		my $mb_so_far = `du -ms $tmp_dir`; $mb_so_far =~ s/\s.*$//;
 		my $remaining = $max_mb - $mb_so_far;
@@ -213,6 +213,9 @@ sub copy_cd {
 	if ($eject) { system $eject; }
 	while (1) {
 		ask("insert blank CD into drive and press Return...");
+		if (($> == 0) and (! -e '/dev/cdrom')) {  # CURSE icedax!
+			symlink '/dev/sr0', '/dev/cdrom';
+		}
 		system "$cdrecord dev=/dev/cdrom -v -dao -useinfo -text  *.wav";
 		if ($eject) { system $eject; }
 		last unless confirm "do you want to write that to another CD ?";
@@ -278,6 +281,7 @@ sub copy_dvd {
 	use File::Path; File::Path::remove_tree("$tmp_mnt");
 	system "ls -l $tmpfile";
 	# to be fussy, could  mount -o loop $tmpfile  and check it's OK ...
+	if (! -s $tmpfile) { warn " the iso fs was empty :-(\n"; return; }
 	while (1) {
 		ask("insert blank DVD into drive, wait for light to go out, then press Return...");
 		# suppress line-feeds in the progress-bar (on stderr) ...
@@ -790,6 +794,7 @@ sub set_cdda_device {
 		$ENV{CDDA_DEVICE} = '/dev/cdrom:@';
 		inform("using $ENV{CDDA_DEVICE} ...");
 		return 1;
+	} elsif (-e '/dev/sr0' and ! $>) { symlink '/dev/sr0', '/dev/cdrom'; }
 	}
 	system "eject"; system "eject -t"; sleep 3;
 	if ($>) {

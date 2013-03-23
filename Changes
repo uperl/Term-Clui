@@ -1,3 +1,4 @@
+20130323 1.67 Home and End work in sub ask; bug fixes in sub ask_password
 20120905 1.66 ask_filename strips trailing space after filename-completion
 20120327 1.65 also ask_filename introduced
 20120310 view uses antiword, wv or catdoc on .doc files

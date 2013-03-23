@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.66';   # 
+$VERSION = '1.67';   # 
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -74,13 +74,15 @@ $KEY_DOWN  = 0402;
 $KEY_ENTER = "\r";
 $KEY_INSERT = 0525;
 $KEY_DELETE = 0524;
-$KEY_PPAGE = 0523;
-$KEY_NPAGE = 0522;
-$KEY_BTAB  = 0541;
+$KEY_HOME   = 0523;
+$KEY_END    = 0522;
+$KEY_PPAGE  = 0521;
+$KEY_NPAGE  = 0520;
+$KEY_BTAB   = 0541;
 my $AbsCursX = 0; my $AbsCursY = 0; my $TopRow = 0; my $CursorRow;
 my $LastEventWasPress = 0;  # in order to ignore left-over button-ups
 my %SpecialKey = map { $_, 1 } (   # 1.51, used by ask to ignore these
-	$KEY_UP, $KEY_LEFT, $KEY_RIGHT, $KEY_DOWN,
+	$KEY_UP, $KEY_LEFT, $KEY_RIGHT, $KEY_DOWN, $KEY_HOME, $KEY_END,
 	$KEY_PPAGE, $KEY_NPAGE, $KEY_BTAB, $KEY_INSERT, $KEY_DELETE
 );
 
@@ -146,6 +148,8 @@ sub getch {
 			if ($c eq 'B') { return($KEY_DOWN); }
 			if ($c eq 'C') { return($KEY_RIGHT); }
 			if ($c eq 'D') { return($KEY_LEFT); }
+			if ($c eq 'F') { return($KEY_END); }   # 1.67
+			if ($c eq 'H') { return($KEY_HOME); }  # 1.67
             if ($c eq 'M') {   # mouse report - we must be in BYTES !
 				# http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
 				my $event_type = ord(getc_wrapper(0))-32;
@@ -434,7 +438,7 @@ sub ask { my ($question, $default) = @_;
 		&speak("$question, default is $default");
 		$default =~ s/\t/	/g;
 		@s = split(q{}, $default); $n = scalar @s; $i = $[;
-		foreach $j ($[ .. $n) { &puts($s[$j]); }
+		foreach $j ($[ .. $#s) { &puts($s[$j]); }
 		&left($n);
 	} else {
 		&speak($question);
@@ -453,7 +457,7 @@ sub ask { my ($question, $default) = @_;
 		} elsif ($c == $KEY_DELETE) {  # 1.54
 			if ($i < $n) {
 			 	$n--; splice(@s, $i, 1);
-			  	foreach $j ($i .. $n) { &puts($s[$j]); }
+			  	foreach $j ($i..$#s) { &puts($silent ? "x" : $s[$j]); } # 1.67
 			  	&clrtoeol(); &left($n-$i);
 			}
 		} elsif (($c eq "\cH") || ($c eq "\c?")) {
@@ -461,7 +465,7 @@ sub ask { my ($question, $default) = @_;
 			 	$n--; $i--;
 				if (! $silent) { &speak($s[$i]); }   # 1.63
 				splice(@s, $i, 1); &left(1);
-			  	foreach $j ($i .. $n) { &puts($s[$j]); }
+			  	foreach $j ($i..$#s) { &puts($silent ? "x" : $s[$j]); } # 1.67
 			  	&clrtoeol(); &left($n-$i);
 			}
 		} elsif ($c eq "\cC") {  # 1.56
@@ -469,8 +473,8 @@ sub ask { my ($question, $default) = @_;
 			warn "^C\n"; kill('INT', $$); return undef;
 		} elsif ($c eq "\cX" || $c eq "\cD") {  # clear ...
 			&left($i); $i = 0; $n = 0; &clrtoeol(); @s = ();
-		} elsif ($c eq "\cA") { &left($i); $i = 0;
-		} elsif ($c eq "\cE") { &right($n-$i); $i = $n;
+		} elsif ($c eq "\cA" || $c == $KEY_HOME) { &left($i); $i = 0;
+		} elsif ($c eq "\cE" || $c == $KEY_END)  { &right($n-$i); $i = $n;
 		} elsif ($c eq "\cL") { &speak(join("", @s));  # redraw ...
 		} elsif ($SpecialKey{$c}) { &beep();
 		} elsif (ord($c) >= 32) {  # 1.51
@@ -478,7 +482,7 @@ sub ask { my ($question, $default) = @_;
 			&puts($silent ? "x" : $c);
 			if (! $silent) {  &speak($c); }
 			$n++; $i++;
-			foreach $j ($i .. $n) { &puts($s[$j]); }
+			foreach $j ($i..$#s) { &puts($silent ? "x" : $s[$j]); }  # 1.67
 			&clrtoeol();  &left($n-$i);
 		} else { &beep();
 		}
@@ -1358,7 +1362,7 @@ There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
 http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
 
-This is Term::Clui.pm version 1.66
+This is Term::Clui.pm version 1.67
 
 =head1 WINDOW-SIZE
 
@@ -1658,6 +1662,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.66/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.67/py/TermClui.py
 
 =cut
