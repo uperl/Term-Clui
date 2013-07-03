@@ -787,6 +787,7 @@ sub timiditycfg {
 	}
 	close P; return '';
 }
+
 sub set_cdda_device {
 	if ($ENV{CDDA_DEVICE}) { return 1; }
 	inform(" you should set the CDDA_DEVICE environment variable!");
@@ -794,7 +795,8 @@ sub set_cdda_device {
 		$ENV{CDDA_DEVICE} = '/dev/cdrom:@';
 		inform("using $ENV{CDDA_DEVICE} ...");
 		return 1;
-	} elsif (-e '/dev/sr0' and ! $>) { symlink '/dev/sr0', '/dev/cdrom'; }
+	} elsif (-e '/dev/sr0' and ! $>) {
+		symlink '/dev/sr0', '/dev/cdrom';
 	}
 	system "eject"; system "eject -t"; sleep 3;
 	if ($>) {

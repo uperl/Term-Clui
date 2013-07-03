@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.67';   # 
+$VERSION = '1.68';   # handle Haiku's \eO[ABCD] arrow-keys
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -42,7 +42,7 @@ if ($ENV{'CLUI_SPEAK'}) {  # 1.62 emacspeak not very relevant as a criterion
 	}
 	$Eflite = &which('eflite');
 	$Espeak = &which('espeak');
-	if ($Eflite) {
+	if ($Eflite && !$Espeak) {   # 1.68 Espeak should be the default
 		if (open($Eflite_FH,'|-',$Eflite)) {
 			select((select($Eflite_FH), $| = 1)[$[]); print $Eflite_FH q{};
 		} else {
@@ -142,6 +142,16 @@ sub getch {
 		if ($c eq '5') { getc_wrapper(0); return($KEY_PPAGE); }
 		if ($c eq '6') { getc_wrapper(0); return($KEY_NPAGE); }
 		if ($c eq 'Z') { return($KEY_BTAB); }
+		if ($c eq 'O') {   # 1.68 Haiku wierdness, inherited from an old Suse
+			$c = getc_wrapper(0);
+			if ($c eq 'A') { return($KEY_UP); }    # 1.68
+			if ($c eq 'B') { return($KEY_DOWN); }  # 1.68
+			if ($c eq 'C') { return($KEY_RIGHT); } # 1.68
+			if ($c eq 'D') { return($KEY_LEFT); }  # 1.68
+			if ($c eq 'F') { return($KEY_END); }   # 1.68
+			if ($c eq 'H') { return($KEY_HOME); }  # 1.68
+			return($c);
+		}
 		if ($c eq '[') {
 			$c = getc_wrapper(0);
 			if ($c eq 'A') { return($KEY_UP); }
@@ -1181,7 +1191,7 @@ sub speak {  my ($text, $wait) = @_;
 			# useless emacspeak op: tts_sy nc_state all 0 0  1 225\nq {[:np  ]}
 			if ($wait) { select(undef,undef,undef,0.3+0.07*length($text)); }
 		}
-	} elsif ($Espeak) {
+	} elsif ($Espeak) {  # 1.68 should be using Speech::eSpeak !
 		if ($Espeak_PID) { kill SIGHUP, $Espeak_PID; wait; $Espeak_PID = 0; }
 		$Espeak_PID = fork();
 		if ($Espeak_PID) {
@@ -1360,9 +1370,9 @@ The application needs no modification.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.68/py/TermClui.py
 
-This is Term::Clui.pm version 1.67
+This is Term::Clui.pm version 1.68
 
 =head1 WINDOW-SIZE
 
@@ -1662,6 +1672,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.67/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.68/py/TermClui.py
 
 =cut

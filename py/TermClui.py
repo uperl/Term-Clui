@@ -57,16 +57,16 @@ the computer is a human-like conversation-partner, this works very
 naturally.  The application needs no modification.
 
 Download TermClui.py from  www.pjb.com.au/midi/free/TermClui.py  or
-from http://cpansearch.perl.org/src/PJB/Term-Clui-1.62/py/TermClui.py
+from http://cpansearch.perl.org/src/PJB/Term-Clui-1.67/py/TermClui.py
 and put it in your PYTHONPATH.  TermClui.py depends on Python3.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.65
+Term::Clui and Term::Clui::FileSelect.  This is version 1.67
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.65'
+VERSION = '1.67'
 
 def _which(s):
     for d in os.getenv('PATH').split(':'):
@@ -137,15 +137,17 @@ _KEY_DOWN  = 0o402
 _KEY_ENTER = "\r"
 _KEY_INSERT = 0o525
 _KEY_DELETE = 0o524
-_KEY_PPAGE = 0o523
-_KEY_NPAGE = 0o522
-_KEY_BTAB  = 0o541
+_KEY_HOME   = 0o523
+_KEY_END    = 0o522
+_KEY_PPAGE  = 0o521
+_KEY_NPAGE  = 0o520
+_KEY_BTAB   = 0o541
 _getchar = lambda: sys.stdin.read(1)
-_ttyin   = 0
-_ttyout  = 0
+_ttyin    = 0
+_ttyout   = 0
 _AbsCursX = 0
 _AbsCursY = 0
-_TopRow = 0
+_TopRow   = 0
 _CursorRow = 0
 _LastEventWasPress = False
 # _SpecialKey unneeded - we test for class int
@@ -235,7 +237,7 @@ def _dbc(c):
 
 def _getch():
     global _KEY_UP, _KEY_DOWN, _KEY_RIGHT, _KEY_LEFT
-    global _KEY_PPAGE, _KEY_NPAGE, _KEY_BTAB
+    global _KEY_PPAGE, _KEY_NPAGE, _KEY_BTAB, _KEY_HOME, _KEY_END
     global _AbsCursX, _AbsCursY
     c = _getc_wrapper(0)
     if c == "\033":
@@ -274,6 +276,10 @@ def _getch():
                 return _KEY_RIGHT 
             if (c == 'D'):
                 return _KEY_LEFT 
+            if (c == 'F'):
+                return _KEY_END  # 1.67
+            if (c == 'H'):
+                return _KEY_HOME  # 1.67
             if (c == 'M'):   # mouse report
                 # http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
                 event_type = ord(_getc_wrapper(0))-32;
@@ -593,7 +599,7 @@ def ask_password(question):
     r'''Like ask, but with no echo. Use it for passwords.'''
     global _silent
     _silent = True
-    ask(question)
+    return ask(question)
 
 def ask_filename(question):
     r'''Uses the readline module to provide filename-completion with the Tab
@@ -609,7 +615,7 @@ and choose() do.  This function was introduced in version 1.65.'''
     #my $filename = $term->readline('');
     #print STDERR "\e[J";
     #return $filename;
-    ask(question)
+    return ask(question)
 
 def ask(question, default=''):
   try:
@@ -654,41 +660,41 @@ ask() returns the string when the user presses Enter.
                 i-=1
                 _left(1)
         elif c == _KEY_RIGHT and i < n:
-            _puts('x') if _silent else _puts(s_a[i])
+            _puts('x') if _silent else _puts(s_a[j])
             i+=1
         elif c == _KEY_DELETE and i < n:
-             n -= 1
-             s_a.pop(i)   # splice(@s, $i, 1)
-             j = i
-             while j < n:
-                 _puts(s_a[j])
-                 j += 1
-             _clrtoeol()
-             _left(n-i)
+            n -= 1
+            s_a.pop(i)   # splice(@s, $i, 1)
+            j = i
+            while j < n:
+                _puts('x') if _silent else _puts(s_a[j])
+                j += 1
+            _clrtoeol()
+            _left(n-i)
         elif (c == "\b") or (c == "\177"):
             if i > 0:
-                 n -= 1
-                 i -= 1
-                 if not _silent:   # 1.63
-                     _speak(s_a[i])
-                 s_a.pop(i)   # splice(@s, $i, 1)
-                 _left(1)
-                 j = i
-                 while j < n:
-                     _puts(s_a[j])
-                     j += 1
-                 _clrtoeol()
-                 _left(n-i)
+                n -= 1
+                i -= 1
+                if not _silent:   # 1.63
+                    _speak(s_a[i])
+                s_a.pop(i)   # splice(@s, $i, 1)
+                _left(1)
+                j = i
+                while j < n:
+                    _puts('x') if _silent else _puts(s_a[j])
+                    j += 1
+                _clrtoeol()
+                _left(n-i)
         elif c == "\030" or c == "\004":  # clear ...
             _left(i)
             i = 0
             n = 0
             _clrtoeol()
             s_a = []
-        elif c == "\001":
+        elif c == "\001" or c == _KEY_HOME:  # 1.67
             _left(i)
             i = 0
-        elif c == "\005":
+        elif c == "\005" or c == _KEY_END:  # 1.67
             _right(n-i)
             i = n
         elif c == "\014":
