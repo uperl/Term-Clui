@@ -253,8 +253,8 @@ sub copy_dvd {
 	#	if (! rmdir $tmp_mnt) { warn "can't rmdir $tmp_mnt: $!\n"; }
 	#	return 0;
 	#}
-	#system "ls -lR $tmp_mnt/*";
 
+	warn "$dvdbackup -v -M -o $tmp_mnt -i /dev/cdrom\n";
 	system "$dvdbackup -v -M -o $tmp_mnt -i /dev/cdrom";  # uses libdvdcss!
 	# discover the DVD's title
 	my $dh; opendir($dh, $tmp_mnt) or die "can't opendir $tmp_mnt: $!";
@@ -265,20 +265,23 @@ sub copy_dvd {
 	if (1 != scalar @ds) {
 		warn "directories @ds found in $tmp_mnt/ , using $title\n";
 	}
-	mkdir "$tmp_mnt/$title/AUDIO_TS";
+	if (! mkdir "$tmp_mnt/$title/AUDIO_TS") {
+		warn " can't mkdir $tmp_mnt/$title/AUDIO_TS\n";
+	}
 	
     # mkisofs -dvd-video -o i1.img d1/NAQOYQATSI/
     # growisofs -dvd-compat -Z /dev/sr0=i1.img
-
 	# suppress line-feeds in the progress-bar (on stderr) ...
 	system "$mkisofs -gui -r -J -T -dvd-video -allow-limited-size"
-	 ." -V Video_DVD -o $tmpfile $tmp_mnt/$title"
+	 ." -V Video_DVD -o $tmpfile '$tmp_mnt/$title'"
 	 ." 2>&1 | perl -pe 's/\$/\\e[K\\e[A/'";
+	# quotes 20130611, but should use the list form of system
 	#system "umount $tmp_mnt";
 	print "\n";
 	if ($eject) { system $eject; }
 	# if (! rmdir $tmp_mnt) { warn "can't rmdir $tmp_mnt: $!\n"; }
-	use File::Path; File::Path::remove_tree("$tmp_mnt");
+	use File::Path; File::Path::remove_tree($tmp_mnt);
+	unlink $tmp_mnt;
 	system "ls -l $tmpfile";
 	# to be fussy, could  mount -o loop $tmpfile  and check it's OK ...
 	if (! -s $tmpfile) { warn " the iso fs was empty :-(\n"; return; }
@@ -294,6 +297,7 @@ sub copy_dvd {
 	}
 	if (!unlink $tmpfile) { warn "can't unlink $tmpfile: $!\n"; }
 }
+
 sub dvd_size {
 	if (!$mediainfo) {
 		# could try some other program ?
@@ -648,9 +652,9 @@ sub changedir {
 	my $newdir = select_file(-Path=>$ENV{PWD}, -Directory=>1);
 	return unless $newdir;
 	if (! -d $newdir) { sorry("$newdir is not a directory"); return; }
-	if (! chdir $newdir) { sorry("can't chdir to $newdir: \!"); return; }
+	if (! chdir $newdir) { sorry("can't chdir to $newdir: $!"); return; }
 	# assertively rename *.WAV->*.wav, *.MID->*.mid, *.MP3->*.mp3
-	if (! opendir (D, '.')) { sorry("can't opendir $newdir: \!"); return; }
+	if (! opendir (D, '.')) { sorry("can't opendir $newdir: $!"); return; }
 	my @allfiles = grep { !/^\./ } readdir(D);
 	closedir D;
 	my $oldname;

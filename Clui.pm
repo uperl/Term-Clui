@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.68';   # handle Haiku's \eO[ABCD] arrow-keys
+$VERSION = '1.69';   # handle Haiku's \eO[ABCD] arrow-keys
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -391,7 +391,7 @@ sub endwin {
 # ----------------------- size handling ----------------------
 
 my ($maxcols, $maxrows); my $size_changed = 1;
-my ($otherlines, @otherlines, $notherlines);
+my @OtherLines;  # 20131002 $otherlines, $notherlines no longer global
 
 sub check_size {
 	if (! $size_changed) { return; }
@@ -405,9 +405,8 @@ sub check_size {
 	}
 	$maxcols = $maxcols || 80; $maxcols--;
 	$maxrows = $maxrows || 24;
-	if ($notherlines) {
-		@otherlines = &fmt($otherlines);
-		$notherlines = scalar @otherlines;
+	if (@OtherLines) {
+		@OtherLines = &fmt(join("\n",@OtherLines));
 	}
 	$size_changed = 0;
 }
@@ -444,7 +443,7 @@ sub ask { my ($question, $default) = @_;
 	my $nol = &display_question($question);
 
 	my $i = 0; my $n = 0; my @s = (); # cursor position, length, string
-	if ($default) {
+	if (defined $default) {
 		&speak("$question, default is $default");
 		$default =~ s/\t/	/g;
 		@s = split(q{}, $default); $n = scalar @s; $i = $[;
@@ -531,9 +530,8 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 
 	&initscr(mouse_mode=>1, speakup_silent=>1);
 	&size_and_layout(0);
-	@otherlines = &fmt($otherlines);
-	$notherlines = scalar @otherlines;
-	my $speaktext = join(' ',$list[$this_cell],'. ',@otherlines);
+	@OtherLines = &fmt($otherlines);
+	my $speaktext = join(' ',$list[$this_cell],'. ',@OtherLines);
 	if (wantarray) {
 		$#marked = $#list;
 		if ($firstlinelength < $maxcols-30) {
@@ -560,7 +558,7 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 			&up(1); &clrtoeol(); &endwin(); $clue_has_been_given = 0;
 			return wantarray ? () : undef;
 		}
-		my $speaktext = join(' ',$list[$this_cell],'. ',@otherlines);
+		my $speaktext = join(' ',$list[$this_cell],'. ',@OtherLines);
 		&speak("choose, $speaktext");
 	}
 	&wr_screen();
@@ -614,11 +612,12 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 			$this_cell--; &wr_cell($this_cell+1); &wr_cell($this_cell); 
 			&speak($list[$this_cell]);
 		} elsif ((($c eq "j") || ($c == $KEY_DOWN)) && ($irow < $nrows)) {
-			$mid_col = $icol[$this_cell] + 0.5 * length($list[$this_cell]);
-			$left_of_target = 1000;
+			my $mid_col = $icol[$this_cell] + 0.5 * length($list[$this_cell]);
+			my $left_of_target = 1000;
 			for ($inew=$this_cell+1; $inew < $#list; $inew++) {
 				last if $icol[$inew] < $mid_col;	# skip rest of row
 			}
+			my $new_mid_col = 0;
 			for (; $inew < $#list; $inew++) {
 				$new_mid_col = $icol[$inew] + 0.5*length($list[$inew]);
 				last if $new_mid_col >= $mid_col;		# we've reached it
@@ -630,11 +629,12 @@ sub choose {  my $question = shift; local @list = @_;  # @list must be local
 			&wr_cell($iold); &wr_cell($this_cell);
 			&speak($list[$this_cell]);
 		} elsif ((($c eq "k") || ($c == $KEY_UP)) && ($irow > 1)) {
-			$mid_col = $icol[$this_cell] + 0.5*length($list[$this_cell]);
-			$right_of_target = 1000;
+			my $mid_col = $icol[$this_cell] + 0.5*length($list[$this_cell]);
+			my $right_of_target = 1000;
 			for ($inew=$this_cell-1; $inew > 0; $inew--) {
 				last if $irow[$inew] < $irow[$this_cell];	# skip rest of row
 			}
+			my $new_mid_col = 0;
 			for (; $inew > 0; $inew--) {
 				last unless $icol[$inew];
 				$new_mid_col = $icol[$inew] + 0.5*length($list[$inew]);
@@ -731,12 +731,12 @@ sub layout { my @list = @_;
 	return $irow;
 }
 sub wr_screen {
-	my $i;
-	for ($i=$[; $i<=$#list; $i++) {
+	for (my $i=$[; $i<=$#list; $i++) {
 		&wr_cell($i) unless $i==$this_cell;
 	}
+	my $notherlines = scalar @OtherLines;
 	if ($notherlines && ($nrows+$notherlines) < $maxrows) {
-		&puts("\r\n", join("\r\n", @otherlines), "\r");
+		&puts("\r\n", join("\r\n", @OtherLines), "\r");
 	}
 	&wr_cell($this_cell);
 }
@@ -983,9 +983,10 @@ sub edit {	my ($title, $text) = @_;
 		system $ENV{EDITOR} || "vi"; # should also look in ~/db/choices.db
 	} elsif ($argc == 2) {
 		# must create tmp file with title embedded in name
-		$tmpdir = '/tmp';
-		($safename = $title) =~ s/[\W_]+/_/g;
-		$file = "$tmpdir/$safename.$$";
+		my $tmpdir = '/tmp';
+		my $safename = $title;
+		$safename =~ s/[\W_]+/_/g;
+		my $file = "$tmpdir/$safename.$$";
 		if (!open(F,">$file")) {&sorry("can't open $file: $!\n");return q{};}
 		print F $text; close F;
 		$editor = $ENV{EDITOR} || "vi"; # should also look in ~/db/choices.db
@@ -1225,19 +1226,19 @@ sub speak {  my ($text, $wait) = @_;
 sub display_question {   my $question = shift; my %options = @_;
 	# used by &ask and &confirm, but not by &choose ...
 	&check_size();
-	my ($firstline, @otherlines);
+	my ($firstline, $otherlines);  # 20131002 @otherlines => $otherlines
 	if ($options{nofirstline}) {
-		@otherlines = &fmt($question);
+		@OtherLines = &fmt($question);
 	} else {
 		($firstline,$otherlines) = split(/\r?\n/, $question, 2);
-		@otherlines = &fmt($otherlines);
+		@OtherLines = &fmt($otherlines);
 		if ($firstline) { &puts("$firstline "); }
 	}
-	if (@otherlines) {
-		&puts("\r\n", join("\r\n", @otherlines), "\r");
+	if (@OtherLines) {
+		&puts("\r\n", join("\r\n", @OtherLines), "\r");
 		&goto(1 + length $firstline, 0);
 	}
-	return scalar @otherlines;
+	return scalar @OtherLines;
 }
 sub erase_lines {  # leaves cursor at beginning of line $_[$[]
 	&goto(0, $_[$[]); print TTY "\e[J";
@@ -1370,9 +1371,9 @@ The application needs no modification.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.68/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.69/py/TermClui.py
 
-This is Term::Clui.pm version 1.68
+This is Term::Clui.pm version 1.69
 
 =head1 WINDOW-SIZE
 
@@ -1672,6 +1673,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.68/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.69/py/TermClui.py
 
 =cut

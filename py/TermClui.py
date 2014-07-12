@@ -61,12 +61,12 @@ from http://cpansearch.perl.org/src/PJB/Term-Clui-1.67/py/TermClui.py
 and put it in your PYTHONPATH.  TermClui.py depends on Python3.
 
 TermClui.py is a translation into Python3 of the Perl CPAN Modules
-Term::Clui and Term::Clui::FileSelect.  This is version 1.67
+Term::Clui and Term::Clui::FileSelect.  This is version 1.69
 '''
 import re, sys, select, signal, subprocess, os, random
 import termios, fcntl, struct, stat, time, dbm
 
-VERSION = '1.67'
+VERSION = '1.69'
 
 def _which(s):
     for d in os.getenv('PATH').split(':'):
@@ -266,6 +266,21 @@ def _getch():
             return _KEY_NPAGE 
         if (c == 'Z'):
             return _KEY_BTAB 
+        if (c == 'O'):   # 1.68 Haiku wierdness, inherited from an old Suse
+            c = _getc_wrapper(0)
+            if (c == 'A'):
+                return _KEY_UP    # 1.68
+            if (c == 'B'):
+                return _KEY_DOWN  # 1.68
+            if (c == 'C'):
+                return _KEY_RIGHT # 1.68
+            if (c == 'D'):
+                return _KEY_LEFT  # 1.68
+            if (c == 'F'):
+                return _KEY_END   # 1.68
+            if (c == 'H'):
+                return _KEY_HOME  # 1.68
+            return c
         if (c == '['):
             c = _getc_wrapper(0)
             if (c == 'A'):
