@@ -7,7 +7,7 @@
 #            modify it under the same terms as Perl itself.             #
 #########################################################################
 
-# SCSI: cdda2wav, cdrecord, cdparanoia, idprio, mencoder, mplayer
+# SCSI: cdda2wav, cdrecord, cdparanoia, idprio, avconv, mplayer
 #  $ENV{CDDA_DEVICE} cdrecord -scanbus
 # ATAPI: cdcontrol -f /dev/cd0c info, burncd, mkisofs
 #  $ENV{CDROM}  /usr/sbin/pciconf -lv, atacontrol list
@@ -751,10 +751,10 @@ EOT
 sub man {
 	my @topics = @_ || (
 	 'aconnect', 'alsamixer', 'aplaymidi', 'arecordmidi', 'atacontrol',
-	 'audio_stuff', 'bristol', 'burncd',
+	 'audio_stuff', 'avconv', 'bristol', 'burncd',
 	 'cdcontrol', 'cdda2wav',  'cdrecord', 'dvd+rw-mediainfo',
 	 'File::Format::RIFF',
-	 'genisoimage', 'icedax', 'lame', 'mencoder', 'mkisofs',
+	 'genisoimage', 'icedax', 'lame', 'mkisofs',
 	 'mplayer', 'normalize', 'normalize-audio', 'pciconf', 'sndfile-play',
 	 'sox', 'soxexam', 'soxeffect',
 	 'Term::Clui', 'Term::Clui::FileSelect', 'timidity', 'timidity.cfg',

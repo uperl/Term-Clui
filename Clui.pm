@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-$VERSION = '1.69';   # handle Haiku's \eO[ABCD] arrow-keys
+$VERSION = '1.70';   # ask_filename() uses readline to display its own prompt
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
@@ -425,11 +425,9 @@ sub ask_filename { my ($question, $default) = @_;  # 1.65 tab-completion
 		return ask($question, $default);
 	}
 	initscr(speakup_silent=>1);
-	my $nol = display_question($question);
 	endwin();
 	$term = new Term::ReadLine 'ProgramName';
-	# print STDERR "$question ";
-	my $filename = $term->readline('');
+	my $filename = $term->readline($question.' ');   # 1.70
 	print STDERR "\e[J";
 	$filename =~ s/ $//;   # 1.66
 	return $filename;
@@ -443,7 +441,7 @@ sub ask { my ($question, $default) = @_;
 	my $nol = &display_question($question);
 
 	my $i = 0; my $n = 0; my @s = (); # cursor position, length, string
-	if (defined $default) {
+	if (defined $default) {  # 1.69 defined, to include 0
 		&speak("$question, default is $default");
 		$default =~ s/\t/	/g;
 		@s = split(q{}, $default); $n = scalar @s; $i = $[;
@@ -1371,9 +1369,9 @@ The application needs no modification.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.69/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.70/py/TermClui.py
 
-This is Term::Clui.pm version 1.69
+This is Term::Clui.pm version 1.70
 
 =head1 WINDOW-SIZE
 
@@ -1673,6 +1671,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.69/py/TermClui.py
+http://cpansearch.perl.org/src/PJB/Term-Clui-1.70/py/TermClui.py
 
 =cut

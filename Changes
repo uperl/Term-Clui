@@ -1,4 +1,5 @@
-20130999 1.69 
+20140999 1.70
+20140712 1.69 ask() displays a default of "0"
 20130703 1.68 handle Haiku's \eO[ABCD] arrow-keys
 20130323 1.67 Home and End work in sub ask; bug fixes in sub ask_password
 20120905 1.66 ask_filename strips trailing space after filename-completion
