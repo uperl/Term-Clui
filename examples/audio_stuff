@@ -159,7 +159,7 @@ sub burn_files {
 	if (! mkdir $tmp_dir) { sorry("can't mkdir $tmp_dir: $!"); $ok=0; }
 	return unless $ok;
 	# must choose_files repeatedly to within size limit
-	my $max_mb = 800;
+	my $max_mb = 700;
 	while (1) {
 		my $mb_so_far = `du -ms $tmp_dir`; $mb_so_far =~ s/\s.*$//;
 		my $remaining = $max_mb - $mb_so_far;
@@ -261,7 +261,7 @@ sub copy_dvd {
 	my @ds = grep { !/^\./ && -d "$tmp_mnt/$_" } readdir($dh);
 	closedir $dh;
 	if (! @ds) { die "no directories found in $tmp_mnt/\n"; }
-	my $title = $ds[$[];
+	my $title = $ds[0];
 	if (1 != scalar @ds) {
 		warn "directories @ds found in $tmp_mnt/ , using $title\n";
 	}
@@ -325,11 +325,11 @@ sub speak {
 	if (! open(P, "|$festival --tts")) {
 		sorry("can't run $festival"); return;
 	}
-	print P $_[$[];
+	print P $_[0];
 	close P;
 }
 
-sub which_track {  my $do_what = $_[$[];
+sub which_track {  my $do_what = $_[0];
 	# cdda2wav produces its output on stderr ARRGghhh :-(
 	if (! open (P, "$cdda2wav -Q -H -g -v toc -J 2>&1 |")) {
 		die "can't run $cdda2wav: $!\n";
@@ -503,8 +503,8 @@ sub play {
 	if (!@outdevices) {
 		sorry("aplaymidi can't see any midi output devices."); return;
 	} elsif (1 == @outdevices) {
-		inform("using midi device $outdevices[$[]");
-		$outport = $device2outport{$outdevices[$[]};
+		inform("using midi device $outdevices[0]");
+		$outport = $device2outport{$outdevices[0]};
 	} else {
 		$outport = $device2outport{choose('To which device ?',@outdevices)};
 		return unless $outport;
@@ -542,8 +542,8 @@ sub midi_in_port {
 	if (!@indevices) {
 		sorry("aconnect can't see any midi input devices."); return;
 	} elsif (1 == @indevices) {
-		inform("using MIDI-input-port $indevices[$[]");
-		$inport = $device2inport{$indevices[$[]};
+		inform("using MIDI-input-port $indevices[0]");
+		$inport = $device2inport{$indevices[0]};
 	} else {
 		$inport
 		 = $device2inport{choose('connect from which device ?',@indevices)};
@@ -567,8 +567,8 @@ sub midi_out_port {
 	if (!@outdevices) {
 		sorry("aconnect can't see any midi output devices."); return;
 	} elsif (1 == @outdevices) {
-		inform("using MIDI-output-port $outdevices[$[]");
-		$outport = $device2outport{$outdevices[$[]};
+		inform("using MIDI-output-port $outdevices[0]");
+		$outport = $device2outport{$outdevices[0]};
 	} else {
 		$outport
 		 = $device2outport{choose('connect to which device ?',@outdevices)};
@@ -769,7 +769,7 @@ sub man {
 }
 
 #----------------------- infrastructure ------------------------
-sub which { my $f; foreach $d (@PATH) {$f="$d/$_[$[]";  return $f if -x $f; }}
+sub which { my $f; foreach $d (@PATH) {$f="$d/$_[0]";  return $f if -x $f; }}
 
 sub tempi {
 	qw(40 42 44 46 48 50 52 54 56 58 60 63 69 72 76 80 84 8 92 96 100 104

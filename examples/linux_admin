@@ -403,7 +403,7 @@ sub adduser {
 		$group = &choose('primary group ?', @groups);
 		foreach (@groups) { if ($_ ne $group) { push @secondary_groups, $_; } }
 	} else {
-		$group = $groups[$[];
+		$group = $groups[0];
 	}
 	return unless $group;
 	my $fullname = &ask('full name     ?');
@@ -439,5 +439,5 @@ sub first_existing {
 	return $f;
 }
 sub which { my $f;
-	foreach $d (@PATH) { $f="$d/$_[$[]";  return $f if -x $f; }
+	foreach $d (@PATH) { $f="$d/$_[0]";  return $f if -x $f; }
 }

@@ -8,7 +8,7 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-$VERSION = '1.70';
+$VERSION = '1.71';
 import Term::Clui(':DEFAULT','back_up');
 require Exporter;
 @ISA = qw(Exporter);
@@ -17,7 +17,7 @@ require Exporter;
 
 no strict; no warnings;
 
-my $home = $ENV{HOME} || $ENV{LOGDIR} || (getpwuid($>))[$[+7];
+my $home = $ENV{HOME} || $ENV{LOGDIR} || (getpwuid($>))[7];
 $home =~ s#([^/])$#$1/#;
 
 sub select_file {   my %option = @_;
@@ -73,7 +73,7 @@ sub select_file {   my %option = @_;
 			@files = ();
 		} elsif ($option{'-FPat'}) {
 			@files = grep(!-d $_, glob("$dir/$option{'-FPat'}"));
-			my $length = $[ + 1 + length $dir;
+			my $length = 1 + length $dir;
 			foreach (@files) { $_ = substr $_, $length; }
 		} else {
 			@files = grep(!-d "$dir/$_", @allfiles);

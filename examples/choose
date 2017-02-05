@@ -14,7 +14,7 @@ use Term::Clui;
 
 my $multiple_choice = 0;
 my $filter_stdin    = 0;
-while ($ARGV[$[] =~ /^-([a-z])/) {
+while ($ARGV[0] =~ /^-([a-z])/) {
 	if ($1 eq 'v')      { shift;
 		my $n = $0; $n =~ s{^.*/([^/]+)$}{$1};
 		print "$n version $Version $VersionDate\n";

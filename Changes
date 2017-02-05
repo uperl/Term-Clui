@@ -1,4 +1,5 @@
-20140999 1.70
+20170205 1.71 eliminate $[ and assume 0
+20141221 1.70 ask_filename() uses readline to display its own prompt
 20140712 1.69 ask() displays a default of "0"
 20130703 1.68 handle Haiku's \eO[ABCD] arrow-keys
 20130323 1.67 Home and End work in sub ask; bug fixes in sub ask_password
