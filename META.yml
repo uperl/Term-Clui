@@ -7,7 +7,7 @@ installdirs:  site
 requires:
   Term::ReadKey: 0
   Term::ReadLine::Gnu: 0
-  Extutils::MakeMaker: 0
+  ExtUtils::MakeMaker: 0
   File::Copy: 0
 recommends:
   Term::Size: 0
