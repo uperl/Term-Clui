@@ -17,6 +17,7 @@ require Exporter;
 @EXPORT_OK = qw(beep tiview back_up get_default set_default timestamp);
 %EXPORT_TAGS = (ALL => [@EXPORT,@EXPORT_OK]);
 
+use 5.006;
 no strict; no warnings;
 
 my $have_Term_ReadKey = 1;

@@ -1,0 +1,7 @@
+/Term-Clui-*
+*.swp
+/MYMETA.*
+/Makefile
+/blib
+/pm_to_blib
+*.bak
