@@ -15,6 +15,7 @@ require Exporter;
 @EXPORT = qw(select_file);
 @EXPORT_OK = qw();
 
+use 5.006;
 no strict; no warnings;
 
 my $home = $ENV{HOME} || $ENV{LOGDIR} || (getpwuid($>))[7];
