@@ -7,6 +7,8 @@ examples/login_shell
 examples/test_script
 lib/Term/Clui.pm
 lib/Term/Clui/FileSelect.pm
+LICENSE
+maint/releaseprep
 Makefile.PL
 MANIFEST			This list of files
 py/TermClui.py
