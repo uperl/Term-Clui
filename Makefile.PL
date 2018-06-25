@@ -29,6 +29,7 @@ WriteMakefile(
                       ],
   ABSTRACT_FROM    => 'lib/Term/Clui.pm',
   MIN_PERL_VERSION => '5.006000',
+  LICENSE          => 'perl',
   PREREQ_PM        => {
     'Term::ReadKey'       => 0,
     'Term::ReadLine::Gnu' => 0,

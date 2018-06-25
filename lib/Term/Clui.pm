@@ -1646,7 +1646,13 @@ I</usr/local/bin/> or elsewhere in your PATH.
 
 =head1 AUTHOR
 
+Original author:
+
 Peter J Billam www.pjb.com.au/comp/contact.html
+
+Current maintainer:
+
+Graham Ollis
 
 =head1 CREDITS
 
