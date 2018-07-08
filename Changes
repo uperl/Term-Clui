@@ -1,5 +1,6 @@
 Revision history for Term-Clui
 
+1.73 2018-07-08 13:06:33 -0400
   - Fixed bug where uparrow on the last choice of a
     2x2 choice of 30 chars each goes up left instead
     of up.
