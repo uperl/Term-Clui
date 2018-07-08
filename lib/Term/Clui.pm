@@ -427,7 +427,7 @@ sub ask_filename { my ($question, $default) = @_;  # 1.65 tab-completion
 	}
 	initscr(speakup_silent=>1);
 	endwin();
-	$term = new Term::ReadLine 'ProgramName';
+	$term = Term::ReadLine->new('ProgramName');
 	my $filename = $term->readline($question.' ');   # 1.70
 	print STDERR "\e[J";
 	$filename =~ s/ $//;   # 1.66
