@@ -1679,6 +1679,6 @@ which were in turn based on some even older curses-based programs in I<C>.
 
 There is an equivalent Python3 module,
 with (as far as possible) the same calling interface, at
-http://cpansearch.perl.org/src/PJB/Term-Clui-1.71/py/TermClui.py
+https://fastapi.metacpan.org/source/PJB/Term-Clui-1.71/py/TermClui.py
 
 =cut
