@@ -8,8 +8,7 @@
 #########################################################################
 
 package Term::Clui;
-our $VERSION = '1.74_01';
-$VERSION =~ tr/_//d;
+our $VERSION = '1.75';
 my $stupid_bloody_warning = $VERSION;  # circumvent -w warning
 require Exporter;
 @ISA = qw(Exporter);
