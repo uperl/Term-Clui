@@ -1654,6 +1654,10 @@ Current maintainer:
 
 Graham Ollis
 
+Contributors:
+
+Peter Scott
+
 =head1 CREDITS
 
 Based on some old perl 4 libraries, I<ask.pl>, I<choose.pl>,

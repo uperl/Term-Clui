@@ -347,6 +347,10 @@ Current maintainer:
 
 Graham Ollis
 
+Contributors:
+
+Peter Scott
+
 # CREDITS
 
 Based on some old perl 4 libraries, _ask.pl_, _choose.pl_,
