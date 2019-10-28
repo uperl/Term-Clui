@@ -34,6 +34,9 @@ WriteMakefile(
     'Term::ReadLine'      => 0,
     'File::Copy'          => 0,
   },
+  TEST_REQUIRES => {
+    'Test::V0' => '0.000092',
+  },
   CONFIGURE_REQUIRES => {
     'ExtUtils::MakeMaker' => '6.56',
   },
