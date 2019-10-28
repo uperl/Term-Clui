@@ -12,154 +12,215 @@ package Term::Clui::FileSelect;
 use 5.006;
 use strict;
 no warnings;
-use Term::Clui(':DEFAULT','back_up', 'set_default');
+use Term::Clui( ':DEFAULT', 'back_up', 'set_default' );
 use Exporter ();
 
-our $VERSION = '1.76';
-our @ISA = qw(Exporter);
-our @EXPORT = qw(select_file);
+our $VERSION   = '1.76';
+our @ISA       = qw(Exporter);
+our @EXPORT    = qw(select_file);
 our @EXPORT_OK = qw();
 
-
-my $home = $ENV{HOME} || $ENV{LOGDIR} || (getpwuid($>))[7];
+my $home = $ENV{HOME} || $ENV{LOGDIR} || ( getpwuid($>) )[7];
 $home =~ s#([^/])$#$1/#;
 
-sub select_file {   my %option = @_;
-	if (!defined $option{'-Path'}) { $option{'-Path'}=$option{'-initialdir'}; }
-	if (!defined $option{'-FPat'}) { $option{'-FPat'}=$option{'-filter'}; }
-	if (!defined $option{'-ShowAll'}) {
-		$option{'-ShowAll'} = $option{'-dotfiles'};
-	}
-	if ($option{'-Directory'}) { $option{'-Chdir'}=1; $option{'-SelDir'}=1; }
-	my $multichoice = 0;
-	if (wantarray && !$option{'-Chdir'} && !$option{'-Create'}) {
-		$option{'-DisableShowAll'} = 1;
-		$multichoice = 1;
-	} elsif (!defined $option{'-Chdir'}) {
-		$option{'-Chdir'} = 1;
-	}
+sub select_file {
+    my %option = @_;
+    if ( !defined $option{'-Path'} ) {
+        $option{'-Path'} = $option{'-initialdir'};
+    }
+    if ( !defined $option{'-FPat'} ) { $option{'-FPat'} = $option{'-filter'}; }
+    if ( !defined $option{'-ShowAll'} ) {
+        $option{'-ShowAll'} = $option{'-dotfiles'};
+    }
+    if ( $option{'-Directory'} ) {
+        $option{'-Chdir'}  = 1;
+        $option{'-SelDir'} = 1;
+    }
+    my $multichoice = 0;
+    if ( wantarray && !$option{'-Chdir'} && !$option{'-Create'} ) {
+        $option{'-DisableShowAll'} = 1;
+        $multichoice = 1;
+    }
+    elsif ( !defined $option{'-Chdir'} ) {
+        $option{'-Chdir'} = 1;
+    }
 
-	my $dir;
-	if ($option{'-Path'} && -d $option{'-Path'}) {
-		$dir=$option{'-Path'};
-		if ($dir =~ m#[^/]$#) { $dir .= '/'; }
-	} else {
-		$dir = $home;
-	}
-	if ($option{'-TopDir'}) {
-		if (!-d $option{'-TopDir'}) { delete $option{'-TopDir'};
-		} elsif ($option{'-TopDir'} =~ m#[^/]$#) { $option{'-TopDir'} .= '/';
-		}
-		if (index $dir, $option{'-TopDir'}) { $dir = $option{'-TopDir'}; }
-	}
+    my $dir;
+    if ( $option{'-Path'} && -d $option{'-Path'} ) {
+        $dir = $option{'-Path'};
+        if ( $dir =~ m#[^/]$# ) { $dir .= '/'; }
+    }
+    else {
+        $dir = $home;
+    }
+    if ( $option{'-TopDir'} ) {
+        if ( !-d $option{'-TopDir'} ) {
+            delete $option{'-TopDir'};
+        }
+        elsif ( $option{'-TopDir'} =~ m#[^/]$# ) {
+            $option{'-TopDir'} .= '/';
+        }
+        if ( index $dir, $option{'-TopDir'} ) { $dir = $option{'-TopDir'}; }
+    }
 
-	my ($new, $file, @allfiles, @files, @dirs, @pre, @post, %seen, $isnew);
-	my @dotfiles;
+    my ( $new, $file, @allfiles, @files, @dirs, @pre, @post, %seen, $isnew );
+    my @dotfiles;
 
-	while () {
-		if (! opendir (D, $dir)) { warn "can't opendir $dir: $!\n"; return 0; }
-		if ($option{'-SelDir'}) { @pre = ('./'); } else { @pre = (); }
-		@post = ();
-		@allfiles = sort grep(!/^\.\.?$/, readdir D); closedir D;
-		@dotfiles = grep(/^\./, @allfiles);
-		if ($option{'-ShowAll'}) {
-			if (@dotfiles && !$option{'-DisableShowAll'}) {
-				@post='Hide DotFiles';
-			}
-		} else {
-			@allfiles = grep(!/^\./, @allfiles);
-			if (@dotfiles && !$option{'-DisableShowAll'}) {
-				@post='Show DotFiles';
-			}
-		}
-		# split @allfiles into @files and @dirs for option processing ...
-		@dirs  = grep(-d "$dir/$_" && -r "$dir/$_", @allfiles);
-		if ($option{'-Directory'}) {
-			@files = ();
-		} elsif ($option{'-FPat'}) {
-			@files = grep(!-d $_, glob("$dir/$option{'-FPat'}"));
-			my $length = 1 + length $dir;
-			foreach (@files) { $_ = substr $_, $length; }
-		} else {
-			@files = grep(!-d "$dir/$_", @allfiles);
-		}
-		if ($option{'-Chdir'}) {
-			foreach (@dirs) { s#$#/#; }
-			if ($option{'-TopDir'}) {
-				my $up = $dir; $up =~ s#[^/]+/?$##;   # find parent directory
-				if (-1 < index $up, $option{'-TopDir'}) { unshift @pre, '../'; }
-				# must check for symlinks to outside the TopDir ...
-			} else { unshift @pre, '../';
-			}
-		} elsif (!$option{'-SelDir'}) {
-			@dirs = ();
-		}
-		if ($option{'-Create'})     { unshift @post, 'Create New File'; }
-		if ($option{'-TextFile'})   { @files = grep(-T "$dir/$_", @files); }
-		if ($option{'-Owned'})      { @files = grep(-o "$dir/$_", @files); }
-		if ($option{'-Executable'}) { @files = grep(-x "$dir/$_", @files); }
-		if ($option{'-Writeable'})  { @files = grep(-w "$dir/$_", @files); }
-		if ($option{'-Readable'})   { @files = grep(-r "$dir/$_", @files); }
-		@allfiles = (@pre, (sort @dirs,@files), @post); # reconstitute @allfiles
+    while () {
+        if ( !opendir( D, $dir ) ) {
+            warn "can't opendir $dir: $!\n";
+            return 0;
+        }
+        if   ( $option{'-SelDir'} ) { @pre = ('./'); }
+        else                        { @pre = (); }
+        @post     = ();
+        @allfiles = sort grep( !/^\.\.?$/, readdir D );
+        closedir D;
+        @dotfiles = grep( /^\./, @allfiles );
 
-		my $title;
-		if ($option{'-Title'}) { $title = "$option{'-Title'} in $dir"
-		} else { $title = "in directory $dir ?";
-		}
-		if ($option{'-File'}) { &set_default($title, $option{'-File'}) }
-		$Term::Clui::SpeakMode{'dot'} = 1;
-		if ($multichoice) {
-			my @new = &choose ($title, @allfiles);
-			$Term::Clui::SpeakMode{'dot'} = 0;
-			return () unless @new;
-			foreach (@new) { $_="$dir$_"; }
-			return @new;
-		}
-		$new = &choose ($title, @allfiles);
-		$Term::Clui::SpeakMode{'dot'} = 0;
+        if ( $option{'-ShowAll'} ) {
+            if ( @dotfiles && !$option{'-DisableShowAll'} ) {
+                @post = 'Hide DotFiles';
+            }
+        }
+        else {
+            @allfiles = grep( !/^\./, @allfiles );
+            if ( @dotfiles && !$option{'-DisableShowAll'} ) {
+                @post = 'Show DotFiles';
+            }
+        }
 
-		if ($option{'-ShowAll'} && $new eq 'Hide DotFiles') {
-			delete $option{'-ShowAll'}; redo;
-		} elsif (!$option{'-ShowAll'} && $new eq 'Show DotFiles') {
-			$option{'-ShowAll'} = 1; redo;
-		}
-		if ($new eq "Create New File") {
-			$new = &ask ("new file name ?");  # validating this is a chore ...
-			if (! $new) { next; }
-			if ($new =~ m#^/#) { $file = $new; } else { $file = "$dir$new"; }
-			$file =~ s#/+#/#g;  # simplify //// down to /
-			while ($file =~ m#./\.\./#) { $file =~ s#[^/]*/\.\./##; }  # zap /../
-			$file =~ s#/[^/]*/\.\.$##;  # and /.. at end
-			if ($option{'-TopDir'}) {  # check against escape from TopDir
-				if (index $file, $option{'-TopDir'}) {
-					$dir = $option{'-TopDir'}; next;
-				}
-			}
-			if (-d $file) {  # pre-existing directory ?
-				if ($option{'-SelDir'}) { return $file;
-				} else {
-					$dir=$file; if ($dir =~ m#[^/]$#) { $dir.='/'; } next;
-				}
-			}
-			$file =~ m#^(.*/)([^/]+)$#;
-			if (-e $file) { $dir = $1; $option{'-File'} = $2; next; } # exists ?
-			# must check for creatability (e.g. dir exists and is writeable)
-			if (-d $1 && -w $1) { return $file; }
-			if (!-d $1) { &sorry ("directory $1 does not exist."); next; }
-			&sorry ("directory $1 is not writeable."); next;
-		}
-		return undef unless $new;
-		if ($new eq './' && $option{'-SelDir'}) { return $dir; }
-		if ($new =~ m#^/#) { $file = $new; # abs filename
-		} else { $file = "$dir$new";       # rel filename (slash always at end)
-		}
-		if ($new eq '../') { $dir =~ s#[^/]+/?$##; &back_up(); next;
-		} elsif ($new eq './') {
-			if ($option{'-SelDir'}) { return $dir; } $file = $dir;
-		} elsif ($file =~ m#/$#) { $dir = $file; &back_up(); next;
-		} elsif (-f $file) { return $file;
-		}
-	}
+        # split @allfiles into @files and @dirs for option processing ...
+        @dirs = grep( -d "$dir/$_" && -r "$dir/$_", @allfiles );
+        if ( $option{'-Directory'} ) {
+            @files = ();
+        }
+        elsif ( $option{'-FPat'} ) {
+            @files = grep( !-d $_, glob("$dir/$option{'-FPat'}") );
+            my $length = 1 + length $dir;
+            foreach (@files) { $_ = substr $_, $length; }
+        }
+        else {
+            @files = grep( !-d "$dir/$_", @allfiles );
+        }
+        if ( $option{'-Chdir'} ) {
+            foreach (@dirs) { s#$#/#; }
+            if ( $option{'-TopDir'} ) {
+                my $up = $dir;
+                $up =~ s#[^/]+/?$##;    # find parent directory
+                if ( -1 < index $up, $option{'-TopDir'} ) {
+                    unshift @pre, '../';
+                }
+
+                # must check for symlinks to outside the TopDir ...
+            }
+            else {
+                unshift @pre, '../';
+            }
+        }
+        elsif ( !$option{'-SelDir'} ) {
+            @dirs = ();
+        }
+        if ( $option{'-Create'} ) { unshift @post, 'Create New File'; }
+        if ( $option{'-TextFile'} )   { @files = grep( -T "$dir/$_", @files ); }
+        if ( $option{'-Owned'} )      { @files = grep( -o "$dir/$_", @files ); }
+        if ( $option{'-Executable'} ) { @files = grep( -x "$dir/$_", @files ); }
+        if ( $option{'-Writeable'} )  { @files = grep( -w "$dir/$_", @files ); }
+        if ( $option{'-Readable'} )   { @files = grep( -r "$dir/$_", @files ); }
+        @allfiles =
+          ( @pre, ( sort @dirs, @files ), @post );    # reconstitute @allfiles
+
+        my $title;
+        if ( $option{'-Title'} ) {
+            $title = "$option{'-Title'} in $dir";
+        }
+        else {
+            $title = "in directory $dir ?";
+        }
+        if ( $option{'-File'} ) { &set_default( $title, $option{'-File'} ) }
+        $Term::Clui::SpeakMode{'dot'} = 1;
+        if ($multichoice) {
+            my @new = &choose( $title, @allfiles );
+            $Term::Clui::SpeakMode{'dot'} = 0;
+            return () unless @new;
+            foreach (@new) { $_ = "$dir$_"; }
+            return @new;
+        }
+        $new = &choose( $title, @allfiles );
+        $Term::Clui::SpeakMode{'dot'} = 0;
+
+        if ( $option{'-ShowAll'} && $new eq 'Hide DotFiles' ) {
+            delete $option{'-ShowAll'};
+            redo;
+        }
+        elsif ( !$option{'-ShowAll'} && $new eq 'Show DotFiles' ) {
+            $option{'-ShowAll'} = 1;
+            redo;
+        }
+        if ( $new eq "Create New File" ) {
+            $new = &ask("new file name ?");    # validating this is a chore ...
+            if ( !$new ) { next; }
+            if   ( $new =~ m#^/# ) { $file = $new; }
+            else                   { $file = "$dir$new"; }
+            $file =~ s#/+#/#g;                 # simplify //// down to /
+            while ( $file =~ m#./\.\./# ) {
+                $file =~ s#[^/]*/\.\./##;
+            }                                  # zap /../
+            $file =~ s#/[^/]*/\.\.$##;     # and /.. at end
+            if ( $option{'-TopDir'} ) {    # check against escape from TopDir
+                if ( index $file, $option{'-TopDir'} ) {
+                    $dir = $option{'-TopDir'};
+                    next;
+                }
+            }
+            if ( -d $file ) {              # pre-existing directory ?
+                if ( $option{'-SelDir'} ) {
+                    return $file;
+                }
+                else {
+                    $dir = $file;
+                    if ( $dir =~ m#[^/]$# ) { $dir .= '/'; }
+                    next;
+                }
+            }
+            $file =~ m#^(.*/)([^/]+)$#;
+            if ( -e $file ) {
+                $dir = $1;
+                $option{'-File'} = $2;
+                next;
+            }    # exists ?
+                # must check for creatability (e.g. dir exists and is writeable)
+            if ( -d $1 && -w $1 ) { return $file; }
+            if ( !-d $1 ) { &sorry("directory $1 does not exist."); next; }
+            &sorry("directory $1 is not writeable.");
+            next;
+        }
+        return undef unless $new;
+        if ( $new eq './' && $option{'-SelDir'} ) { return $dir; }
+        if ( $new =~ m#^/# ) {
+            $file = $new;    # abs filename
+        }
+        else {
+            $file = "$dir$new";    # rel filename (slash always at end)
+        }
+        if ( $new eq '../' ) {
+            $dir =~ s#[^/]+/?$##;
+            &back_up();
+            next;
+        }
+        elsif ( $new eq './' ) {
+            if ( $option{'-SelDir'} ) { return $dir; }
+            $file = $dir;
+        }
+        elsif ( $file =~ m#/$# ) {
+            $dir = $file;
+            &back_up();
+            next;
+        }
+        elsif ( -f $file ) {
+            return $file;
+        }
+    }
 }
 
 1;
