@@ -8,15 +8,18 @@
 #########################################################################
 
 package Term::Clui::FileSelect;
-our $VERSION = '1.76';
-use Term::Clui(':DEFAULT','back_up', 'set_default');
-require Exporter;
-@ISA = qw(Exporter);
-@EXPORT = qw(select_file);
-@EXPORT_OK = qw();
 
 use 5.006;
-no strict; no warnings;
+use strict;
+no warnings;
+use Term::Clui(':DEFAULT','back_up', 'set_default');
+use Exporter ();
+
+our $VERSION = '1.76';
+our @ISA = qw(Exporter);
+our @EXPORT = qw(select_file);
+our @EXPORT_OK = qw();
+
 
 my $home = $ENV{HOME} || $ENV{LOGDIR} || (getpwuid($>))[7];
 $home =~ s#([^/])$#$1/#;
@@ -36,6 +39,7 @@ sub select_file {   my %option = @_;
 		$option{'-Chdir'} = 1;
 	}
 
+	my $dir;
 	if ($option{'-Path'} && -d $option{'-Path'}) {
 		$dir=$option{'-Path'};
 		if ($dir =~ m#[^/]$#) { $dir .= '/'; }
@@ -157,6 +161,7 @@ sub select_file {   my %option = @_;
 		}
 	}
 }
+
 1;
 
 __END__
